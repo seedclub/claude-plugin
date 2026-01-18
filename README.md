@@ -78,4 +78,4 @@ pnpm dev
 
 ## License
 
-MIT
+UNLICENSED
