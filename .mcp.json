@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "seed-network": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js"],
+      "env": {
+        "SEED_NETWORK_TOKEN": "${SEED_NETWORK_TOKEN}",
+        "SEED_NETWORK_API": "${SEED_NETWORK_API:-http://localhost:3000}"
+      }
+    }
+  }
+}
