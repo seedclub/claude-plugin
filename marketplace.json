@@ -1,0 +1,12 @@
+{
+  "owner": {
+    "name": "Seed Club"
+  },
+  "plugins": [
+    {
+      "name": "seed",
+      "description": "Deal sourcing and enrichment for Seed Network",
+      "path": ".claude-plugin"
+    }
+  ]
+}
