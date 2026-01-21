@@ -1,0 +1,5 @@
+{
+  "name": "seedclub-claude-plugin",
+  "description": "Seed Network plugins for Claude Code",
+  "plugins": ["seed"]
+}
