@@ -1,12 +1,14 @@
 {
+  "name": "seedclub",
+  "description": "Seed Network plugins for investment research and deal sourcing",
   "owner": {
     "name": "Seed Club"
   },
   "plugins": [
     {
       "name": "seed",
-      "description": "Deal sourcing and enrichment for Seed Network",
-      "path": ".claude-plugin"
+      "source": "./",
+      "description": "Deal sourcing and enrichment for Seed Network"
     }
   ]
 }
