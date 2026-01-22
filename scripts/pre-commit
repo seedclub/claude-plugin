@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Rebuild dist if src/ files are being committed
+if git diff --cached --name-only | grep -q "^src/"; then
+  echo "Source files changed, rebuilding dist..."
+  pnpm build
+  git add dist/
+fi

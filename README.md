@@ -5,15 +5,8 @@ Deal sourcing and enrichment plugin for [Seed Network](https://seed.network).
 ## Installation
 
 ```bash
-/plugin install seedclub/claude-plugin
-```
-
-Then build the MCP server:
-
-```bash
-cd ~/.claude/plugins/seedclub/claude-plugin
-pnpm install
-pnpm build
+/plugin marketplace add seedclub/claude-plugin
+/plugin install seed@seedclub
 ```
 
 ## Configuration
@@ -70,10 +63,18 @@ The plugin provides these tools via the MCP server:
 
 ```bash
 pnpm install
-pnpm build
+pnpm build      # Bundle MCP server to dist/
+pnpm dev        # Watch mode
+pnpm typecheck  # Type check without emitting
+```
 
-# Watch mode
-pnpm dev
+### Pre-commit Hook
+
+Install the pre-commit hook to auto-rebuild dist/ when src/ changes:
+
+```bash
+cp scripts/pre-commit .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
 ```
 
 ## License
