@@ -12,6 +12,8 @@ import { createCompany, updateCompany, getCompany, listCompanies, searchCompanie
 import { saveResearch, getResearch, queryResearch, linkResearch } from "./tools/research.js";
 import { addEnrichment, getEnrichments, cancelEnrichment } from "./tools/enrichments.js";
 import { getCurrentUser, getSyncStatus } from "./tools/utility.js";
+import { clearCredentials } from "./api-client.js";
+import { getStoredToken } from "./auth.js";
 
 const server = new Server(
   {
@@ -341,6 +343,24 @@ const tools = [
       type: "object" as const,
       properties: {}
     }
+  },
+
+  // Auth Operations
+  {
+    name: "seed_logout",
+    description: "Clear stored authentication credentials. Use this to switch accounts or troubleshoot auth issues.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {}
+    }
+  },
+  {
+    name: "seed_auth_status",
+    description: "Check current authentication status and which account is logged in.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {}
+    }
   }
 ];
 
@@ -423,6 +443,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "sync_status":
         result = await getSyncStatus();
         break;
+
+      // Auth operations
+      case "seed_logout":
+        await clearCredentials();
+        result = { success: true, message: "Logged out. Next API call will require re-authentication." };
+        break;
+      case "seed_auth_status": {
+        const stored = await getStoredToken();
+        if (stored) {
+          result = {
+            authenticated: true,
+            email: stored.email,
+            apiBase: stored.apiBase,
+            tokenCreatedAt: stored.createdAt,
+          };
+        } else if (process.env.SEED_NETWORK_TOKEN) {
+          result = {
+            authenticated: true,
+            source: "environment variable (SEED_NETWORK_TOKEN)",
+          };
+        } else {
+          result = {
+            authenticated: false,
+            message: "No stored credentials. Next API call will trigger browser authentication.",
+          };
+        }
+        break;
+      }
 
       default:
         return {

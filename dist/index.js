@@ -20645,9 +20645,282 @@ var StdioServerTransport = class {
   }
 };
 
+// src/auth.ts
+import { createServer } from "http";
+import { randomBytes } from "crypto";
+import { homedir } from "os";
+import { join } from "path";
+import { readFile, writeFile, mkdir, unlink, chmod } from "fs/promises";
+import { exec } from "child_process";
+import { promisify } from "util";
+var execAsync = promisify(exec);
+var CONFIG_DIR = join(homedir(), ".config", "seed-network");
+var TOKEN_FILE = join(CONFIG_DIR, "token");
+var CALLBACK_TIMEOUT_MS = 12e4;
+var DEFAULT_API_BASE = "https://beta.seedclub.com";
+function getApiBase() {
+  return process.env.SEED_NETWORK_API || DEFAULT_API_BASE;
+}
+async function getStoredToken() {
+  try {
+    const content = await readFile(TOKEN_FILE, "utf-8");
+    const stored = JSON.parse(content);
+    if (!stored.token || !stored.token.startsWith("sn_")) {
+      return null;
+    }
+    return stored;
+  } catch {
+    return null;
+  }
+}
+async function getToken() {
+  if (process.env.SEED_NETWORK_TOKEN) {
+    return process.env.SEED_NETWORK_TOKEN;
+  }
+  const stored = await getStoredToken();
+  return stored?.token ?? null;
+}
+async function storeToken(token, email3, apiBase) {
+  await mkdir(CONFIG_DIR, { recursive: true, mode: 448 });
+  const stored = {
+    token,
+    email: email3,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    apiBase
+  };
+  await writeFile(TOKEN_FILE, JSON.stringify(stored, null, 2), { mode: 384 });
+  try {
+    await chmod(TOKEN_FILE, 384);
+  } catch {
+  }
+}
+async function clearStoredToken() {
+  try {
+    await unlink(TOKEN_FILE);
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function openBrowser(url2) {
+  const platform = process.platform;
+  try {
+    if (platform === "darwin") {
+      await execAsync(`open "${url2}"`);
+    } else if (platform === "win32") {
+      await execAsync(`start "" "${url2}"`);
+    } else {
+      await execAsync(`xdg-open "${url2}"`);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+function findAvailablePort() {
+  return new Promise((resolve, reject) => {
+    const server2 = createServer();
+    server2.listen(0, "127.0.0.1", () => {
+      const address = server2.address();
+      if (address && typeof address === "object") {
+        const port = address.port;
+        server2.close(() => resolve(port));
+      } else {
+        reject(new Error("Could not find available port"));
+      }
+    });
+    server2.on("error", reject);
+  });
+}
+async function authenticate() {
+  const apiBase = getApiBase();
+  const port = await findAvailablePort();
+  const state = randomBytes(16).toString("hex");
+  return new Promise((resolve, reject) => {
+    let server2 = null;
+    let timeoutId = null;
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      if (server2) {
+        server2.close();
+        server2 = null;
+      }
+    };
+    timeoutId = setTimeout(() => {
+      cleanup();
+      reject(new Error("Authentication timed out. Please try again."));
+    }, CALLBACK_TIMEOUT_MS);
+    server2 = createServer(async (req, res) => {
+      const url2 = new URL(req.url || "/", `http://127.0.0.1:${port}`);
+      if (url2.pathname !== "/callback") {
+        res.writeHead(404);
+        res.end("Not found");
+        return;
+      }
+      const receivedState = url2.searchParams.get("state");
+      const token = url2.searchParams.get("token");
+      const email3 = url2.searchParams.get("email");
+      const error2 = url2.searchParams.get("error");
+      if (receivedState !== state) {
+        res.writeHead(400, { "Content-Type": "text/html" });
+        res.end(getErrorHtml("Invalid state parameter. Please try again."));
+        return;
+      }
+      if (error2) {
+        res.writeHead(400, { "Content-Type": "text/html" });
+        res.end(getErrorHtml(error2));
+        cleanup();
+        reject(new Error(error2));
+        return;
+      }
+      if (!token || !token.startsWith("sn_")) {
+        res.writeHead(400, { "Content-Type": "text/html" });
+        res.end(getErrorHtml("Invalid token received"));
+        cleanup();
+        reject(new Error("Invalid token received"));
+        return;
+      }
+      try {
+        await storeToken(token, email3 || "unknown", apiBase);
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end(getSuccessHtml(email3));
+        cleanup();
+        resolve({
+          token,
+          email: email3 || "unknown",
+          apiBase
+        });
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "text/html" });
+        res.end(getErrorHtml("Failed to store token"));
+        cleanup();
+        reject(err);
+      }
+    });
+    server2.listen(port, "127.0.0.1", async () => {
+      const authUrl = `${apiBase}/auth/cli/authorize?port=${port}&state=${state}`;
+      console.error("");
+      console.error("\u{1F510} Authentication required for Seed Network");
+      console.error("");
+      console.error("Opening browser to authenticate...");
+      console.error("If browser doesn't open, visit:");
+      console.error(`  ${authUrl}`);
+      console.error("");
+      console.error("Waiting for authorization... (press Ctrl+C to cancel)");
+      const opened = await openBrowser(authUrl);
+      if (!opened) {
+        console.error("");
+        console.error("\u26A0\uFE0F  Could not open browser automatically.");
+        console.error("Please open the URL above manually.");
+      }
+    });
+    server2.on("error", (err) => {
+      cleanup();
+      reject(err);
+    });
+  });
+}
+async function ensureAuthenticated() {
+  const existingToken = await getToken();
+  if (existingToken) {
+    const stored = await getStoredToken();
+    return {
+      token: existingToken,
+      email: stored?.email || "unknown",
+      apiBase: stored?.apiBase || getApiBase()
+    };
+  }
+  return authenticate();
+}
+function getSuccessHtml(email3) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <title>Authentication Successful</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+    }
+    .container {
+      text-align: center;
+      padding: 40px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+    }
+    .icon { font-size: 64px; margin-bottom: 20px; }
+    h1 { margin: 0 0 10px; font-size: 24px; }
+    p { margin: 0; opacity: 0.8; }
+    .email {
+      font-family: monospace;
+      background: rgba(255,255,255,0.1);
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">\u2713</div>
+    <h1>Authentication Successful</h1>
+    <p>Signed in as <span class="email">${email3 || "user"}</span></p>
+    <p style="margin-top: 20px; opacity: 0.6;">You can close this window.</p>
+  </div>
+</body>
+</html>`;
+}
+function getErrorHtml(message) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <title>Authentication Failed</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+    }
+    .container {
+      text-align: center;
+      padding: 40px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+    }
+    .icon { font-size: 64px; margin-bottom: 20px; }
+    h1 { margin: 0 0 10px; font-size: 24px; color: #ff6b6b; }
+    p { margin: 0; opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">\u2717</div>
+    <h1>Authentication Failed</h1>
+    <p>${message}</p>
+    <p style="margin-top: 20px; opacity: 0.6;">Please try again from Claude Code.</p>
+  </div>
+</body>
+</html>`;
+}
+
 // src/api-client.ts
-var API_BASE = process.env.SEED_NETWORK_API || "http://localhost:3000";
-var API_TOKEN = process.env.SEED_NETWORK_TOKEN;
+var cachedToken = null;
+var cachedApiBase = null;
 var ApiError = class extends Error {
   constructor(status, message, details) {
     super(message);
@@ -20656,15 +20929,38 @@ var ApiError = class extends Error {
     this.name = "ApiError";
   }
 };
+async function getAuthToken() {
+  if (cachedToken) {
+    return cachedToken;
+  }
+  const existingToken = await getToken();
+  if (existingToken) {
+    cachedToken = existingToken;
+    cachedApiBase = getApiBase();
+    return cachedToken;
+  }
+  const result = await ensureAuthenticated();
+  cachedToken = result.token;
+  cachedApiBase = result.apiBase;
+  console.error(`
+\u2713 Authenticated as ${result.email}`);
+  console.error(`Token saved to ~/.config/seed-network/token
+`);
+  return cachedToken;
+}
+function getApiBaseUrl() {
+  return cachedApiBase || getApiBase();
+}
+async function clearCredentials() {
+  cachedToken = null;
+  cachedApiBase = null;
+  await clearStoredToken();
+}
 async function apiRequest(endpoint, options = {}) {
   const { method = "GET", body, params } = options;
-  if (!API_TOKEN) {
-    throw new ApiError(
-      401,
-      "SEED_NETWORK_TOKEN environment variable not set. Generate a token at /admin/api-tokens"
-    );
-  }
-  const url2 = new URL(`/api/mcp${endpoint}`, API_BASE);
+  const token = await getAuthToken();
+  const apiBase = getApiBaseUrl();
+  const url2 = new URL(`/api/mcp${endpoint}`, apiBase);
   if (params) {
     for (const [key, value] of Object.entries(params)) {
       if (value !== void 0) {
@@ -20673,7 +20969,7 @@ async function apiRequest(endpoint, options = {}) {
     }
   }
   const headers = {
-    Authorization: `Bearer ${API_TOKEN}`,
+    Authorization: `Bearer ${token}`,
     "Content-Type": "application/json"
   };
   const response = await fetch(url2.toString(), {
@@ -20681,6 +20977,31 @@ async function apiRequest(endpoint, options = {}) {
     headers,
     body: body ? JSON.stringify(body) : void 0
   });
+  if (response.status === 401) {
+    await clearCredentials();
+    console.error("\n\u26A0\uFE0F  Token expired or revoked. Re-authenticating...\n");
+    const result = await ensureAuthenticated();
+    cachedToken = result.token;
+    cachedApiBase = result.apiBase;
+    console.error(`
+\u2713 Re-authenticated as ${result.email}
+`);
+    headers.Authorization = `Bearer ${cachedToken}`;
+    const retryResponse = await fetch(url2.toString(), {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : void 0
+    });
+    if (!retryResponse.ok) {
+      const retryData = await retryResponse.json();
+      throw new ApiError(
+        retryResponse.status,
+        retryData.error || `Request failed with status ${retryResponse.status}`,
+        retryData.details
+      );
+    }
+    return await retryResponse.json();
+  }
   const data = await response.json();
   if (!response.ok) {
     throw new ApiError(
@@ -21425,6 +21746,23 @@ var tools = [
       type: "object",
       properties: {}
     }
+  },
+  // Auth Operations
+  {
+    name: "seed_logout",
+    description: "Clear stored authentication credentials. Use this to switch accounts or troubleshoot auth issues.",
+    inputSchema: {
+      type: "object",
+      properties: {}
+    }
+  },
+  {
+    name: "seed_auth_status",
+    description: "Check current authentication status and which account is logged in.",
+    inputSchema: {
+      type: "object",
+      properties: {}
+    }
   }
 ];
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -21497,6 +21835,33 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "sync_status":
         result = await getSyncStatus();
         break;
+      // Auth operations
+      case "seed_logout":
+        await clearCredentials();
+        result = { success: true, message: "Logged out. Next API call will require re-authentication." };
+        break;
+      case "seed_auth_status": {
+        const stored = await getStoredToken();
+        if (stored) {
+          result = {
+            authenticated: true,
+            email: stored.email,
+            apiBase: stored.apiBase,
+            tokenCreatedAt: stored.createdAt
+          };
+        } else if (process.env.SEED_NETWORK_TOKEN) {
+          result = {
+            authenticated: true,
+            source: "environment variable (SEED_NETWORK_TOKEN)"
+          };
+        } else {
+          result = {
+            authenticated: false,
+            message: "No stored credentials. Next API call will trigger browser authentication."
+          };
+        }
+        break;
+      }
       default:
         return {
           content: [{ type: "text", text: `Unknown tool: ${name}` }],
