@@ -20651,13 +20651,20 @@ import { randomBytes } from "crypto";
 import { homedir } from "os";
 import { join } from "path";
 import { readFile, writeFile, mkdir, unlink, chmod } from "fs/promises";
-import { exec } from "child_process";
-import { promisify } from "util";
-var execAsync = promisify(exec);
 var CONFIG_DIR = join(homedir(), ".config", "seed-network");
 var TOKEN_FILE = join(CONFIG_DIR, "token");
-var CALLBACK_TIMEOUT_MS = 12e4;
+var CALLBACK_TIMEOUT_MS = 3e5;
 var DEFAULT_API_BASE = "https://beta.seedclub.com";
+var AuthRequiredError = class extends Error {
+  constructor(authUrl, port) {
+    super(`Authentication required. Please visit: ${authUrl}`);
+    this.authUrl = authUrl;
+    this.port = port;
+    this.name = "AuthRequiredError";
+  }
+};
+var pendingAuthServer = null;
+var pendingAuthPromise = null;
 function getApiBase() {
   return process.env.SEED_NETWORK_API || DEFAULT_API_BASE;
 }
@@ -20702,21 +20709,6 @@ async function clearStoredToken() {
     return false;
   }
 }
-async function openBrowser(url2) {
-  const platform = process.platform;
-  try {
-    if (platform === "darwin") {
-      await execAsync(`open "${url2}"`);
-    } else if (platform === "win32") {
-      await execAsync(`start "" "${url2}"`);
-    } else {
-      await execAsync(`xdg-open "${url2}"`);
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
 function findAvailablePort() {
   return new Promise((resolve, reject) => {
     const server2 = createServer();
@@ -20733,27 +20725,44 @@ function findAvailablePort() {
   });
 }
 async function authenticate() {
+  if (pendingAuthPromise) {
+    const token = await getToken();
+    if (token) {
+      if (pendingAuthServer) {
+        pendingAuthServer.close();
+        pendingAuthServer = null;
+      }
+      pendingAuthPromise = null;
+      const stored = await getStoredToken();
+      return {
+        token,
+        email: stored?.email || "unknown",
+        apiBase: stored?.apiBase || getApiBase()
+      };
+    }
+  }
   const apiBase = getApiBase();
   const port = await findAvailablePort();
   const state = randomBytes(16).toString("hex");
-  return new Promise((resolve, reject) => {
-    let server2 = null;
+  const authUrl = `${apiBase}/auth/cli/authorize?port=${port}&state=${state}`;
+  pendingAuthPromise = new Promise((resolve, reject) => {
     let timeoutId = null;
     const cleanup = () => {
       if (timeoutId) {
         clearTimeout(timeoutId);
         timeoutId = null;
       }
-      if (server2) {
-        server2.close();
-        server2 = null;
+      if (pendingAuthServer) {
+        pendingAuthServer.close();
+        pendingAuthServer = null;
       }
+      pendingAuthPromise = null;
     };
     timeoutId = setTimeout(() => {
       cleanup();
       reject(new Error("Authentication timed out. Please try again."));
     }, CALLBACK_TIMEOUT_MS);
-    server2 = createServer(async (req, res) => {
+    pendingAuthServer = createServer(async (req, res) => {
       const url2 = new URL(req.url || "/", `http://127.0.0.1:${port}`);
       if (url2.pathname !== "/callback") {
         res.writeHead(404);
@@ -20800,28 +20809,15 @@ async function authenticate() {
         reject(err);
       }
     });
-    server2.listen(port, "127.0.0.1", async () => {
-      const authUrl = `${apiBase}/auth/cli/authorize?port=${port}&state=${state}`;
-      console.error("");
-      console.error("\u{1F510} Authentication required for Seed Network");
-      console.error("");
-      console.error("Opening browser to authenticate...");
-      console.error("If browser doesn't open, visit:");
-      console.error(`  ${authUrl}`);
-      console.error("");
-      console.error("Waiting for authorization... (press Ctrl+C to cancel)");
-      const opened = await openBrowser(authUrl);
-      if (!opened) {
-        console.error("");
-        console.error("\u26A0\uFE0F  Could not open browser automatically.");
-        console.error("Please open the URL above manually.");
-      }
+    pendingAuthServer.listen(port, "127.0.0.1", () => {
+      console.error(`Auth callback server listening on port ${port}`);
     });
-    server2.on("error", (err) => {
+    pendingAuthServer.on("error", (err) => {
       cleanup();
       reject(err);
     });
   });
+  throw new AuthRequiredError(authUrl, port);
 }
 async function ensureAuthenticated() {
   const existingToken = await getToken();
@@ -21872,6 +21868,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
     };
   } catch (error2) {
+    if (error2 instanceof AuthRequiredError) {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            status: "auth_required",
+            message: "Authentication required for Seed Network. Please open this URL in your browser to sign in:",
+            authUrl: error2.authUrl,
+            instructions: [
+              "1. Click or open the URL above in your browser",
+              "2. Sign in with your Seed Network account",
+              "3. After signing in, retry this command",
+              "Note: The auth session is active for 5 minutes"
+            ]
+          }, null, 2)
+        }]
+      };
+    }
     const errorMessage = error2 instanceof Error ? error2.message : String(error2);
     return {
       content: [{ type: "text", text: `Error: ${errorMessage}` }],

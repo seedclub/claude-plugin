@@ -13,7 +13,7 @@ import { saveResearch, getResearch, queryResearch, linkResearch } from "./tools/
 import { addEnrichment, getEnrichments, cancelEnrichment } from "./tools/enrichments.js";
 import { getCurrentUser, getSyncStatus } from "./tools/utility.js";
 import { clearCredentials } from "./api-client.js";
-import { getStoredToken } from "./auth.js";
+import { getStoredToken, AuthRequiredError } from "./auth.js";
 
 const server = new Server(
   {
@@ -483,6 +483,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }]
     };
   } catch (error) {
+    // Handle authentication required - return friendly message with auth URL
+    if (error instanceof AuthRequiredError) {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            status: "auth_required",
+            message: "Authentication required for Seed Network. Please open this URL in your browser to sign in:",
+            authUrl: error.authUrl,
+            instructions: [
+              "1. Click or open the URL above in your browser",
+              "2. Sign in with your Seed Network account",
+              "3. After signing in, retry this command",
+              "Note: The auth session is active for 5 minutes"
+            ]
+          }, null, 2)
+        }]
+      };
+    }
+
     const errorMessage = error instanceof Error ? error.message : String(error);
     return {
       content: [{ type: "text", text: `Error: ${errorMessage}` }],

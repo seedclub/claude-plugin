@@ -12,18 +12,29 @@
 import { createServer, IncomingMessage, ServerResponse } from "http";
 import { randomBytes } from "crypto";
 import { homedir } from "os";
-import { join, dirname } from "path";
+import { join } from "path";
 import { readFile, writeFile, mkdir, unlink, chmod } from "fs/promises";
-import { exec } from "child_process";
-import { promisify } from "util";
-
-const execAsync = promisify(exec);
 
 // Configuration
 const CONFIG_DIR = join(homedir(), ".config", "seed-network");
 const TOKEN_FILE = join(CONFIG_DIR, "token");
-const CALLBACK_TIMEOUT_MS = 120000; // 2 minutes
+const CALLBACK_TIMEOUT_MS = 300000; // 5 minutes for manual auth
 const DEFAULT_API_BASE = "https://beta.seedclub.com";
+
+/**
+ * Error thrown when authentication is required
+ * Contains the auth URL for the user to visit
+ */
+export class AuthRequiredError extends Error {
+  constructor(public authUrl: string, public port: number) {
+    super(`Authentication required. Please visit: ${authUrl}`);
+    this.name = "AuthRequiredError";
+  }
+}
+
+// Track pending auth session
+let pendingAuthServer: ReturnType<typeof createServer> | null = null;
+let pendingAuthPromise: Promise<AuthResult> | null = null;
 
 export interface StoredToken {
   token: string;
@@ -116,27 +127,6 @@ export async function clearStoredToken(): Promise<boolean> {
 }
 
 /**
- * Open URL in default browser
- */
-async function openBrowser(url: string): Promise<boolean> {
-  const platform = process.platform;
-
-  try {
-    if (platform === "darwin") {
-      await execAsync(`open "${url}"`);
-    } else if (platform === "win32") {
-      await execAsync(`start "" "${url}"`);
-    } else {
-      // Linux and others
-      await execAsync(`xdg-open "${url}"`);
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Find an available port for the callback server
  */
 function findAvailablePort(): Promise<number> {
@@ -157,15 +147,39 @@ function findAvailablePort(): Promise<number> {
 
 /**
  * Start OAuth authentication flow
- * Opens browser, waits for callback with token
+ * Starts callback server and throws AuthRequiredError with the URL
+ * The server runs in background waiting for the callback
  */
 export async function authenticate(): Promise<AuthResult> {
+  // If there's already a pending auth session, check if token was received
+  if (pendingAuthPromise) {
+    // Check if token is now available (auth completed in background)
+    const token = await getToken();
+    if (token) {
+      // Auth completed, clean up
+      if (pendingAuthServer) {
+        pendingAuthServer.close();
+        pendingAuthServer = null;
+      }
+      pendingAuthPromise = null;
+      const stored = await getStoredToken();
+      return {
+        token,
+        email: stored?.email || "unknown",
+        apiBase: stored?.apiBase || getApiBase(),
+      };
+    }
+    // Still waiting for auth - get the current auth URL info
+    // We'll throw again with the same server's info
+  }
+
   const apiBase = getApiBase();
   const port = await findAvailablePort();
   const state = randomBytes(16).toString("hex");
+  const authUrl = `${apiBase}/auth/cli/authorize?port=${port}&state=${state}`;
 
-  return new Promise((resolve, reject) => {
-    let server: ReturnType<typeof createServer> | null = null;
+  // Create the auth promise that resolves when callback is received
+  pendingAuthPromise = new Promise((resolve, reject) => {
     let timeoutId: NodeJS.Timeout | null = null;
 
     const cleanup = () => {
@@ -173,10 +187,11 @@ export async function authenticate(): Promise<AuthResult> {
         clearTimeout(timeoutId);
         timeoutId = null;
       }
-      if (server) {
-        server.close();
-        server = null;
+      if (pendingAuthServer) {
+        pendingAuthServer.close();
+        pendingAuthServer = null;
       }
+      pendingAuthPromise = null;
     };
 
     // Timeout handler
@@ -185,7 +200,7 @@ export async function authenticate(): Promise<AuthResult> {
       reject(new Error("Authentication timed out. Please try again."));
     }, CALLBACK_TIMEOUT_MS);
 
-    server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    pendingAuthServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
       const url = new URL(req.url || "/", `http://127.0.0.1:${port}`);
 
       // Only handle callback path
@@ -246,32 +261,19 @@ export async function authenticate(): Promise<AuthResult> {
       }
     });
 
-    server.listen(port, "127.0.0.1", async () => {
-      const authUrl = `${apiBase}/auth/cli/authorize?port=${port}&state=${state}`;
-
-      // Log to stderr (stdout is used for MCP protocol)
-      console.error("");
-      console.error("🔐 Authentication required for Seed Network");
-      console.error("");
-      console.error("Opening browser to authenticate...");
-      console.error("If browser doesn't open, visit:");
-      console.error(`  ${authUrl}`);
-      console.error("");
-      console.error("Waiting for authorization... (press Ctrl+C to cancel)");
-
-      const opened = await openBrowser(authUrl);
-      if (!opened) {
-        console.error("");
-        console.error("⚠️  Could not open browser automatically.");
-        console.error("Please open the URL above manually.");
-      }
+    pendingAuthServer.listen(port, "127.0.0.1", () => {
+      console.error(`Auth callback server listening on port ${port}`);
     });
 
-    server.on("error", (err) => {
+    pendingAuthServer.on("error", (err) => {
       cleanup();
       reject(err);
     });
   });
+
+  // Throw AuthRequiredError with the URL - this will be caught by tool handlers
+  // The callback server continues running in background
+  throw new AuthRequiredError(authUrl, port);
 }
 
 /**
