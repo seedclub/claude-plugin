@@ -79,6 +79,15 @@ export async function clearCredentials(): Promise<void> {
   await clearStoredToken();
 }
 
+/**
+ * Set new credentials and update the cache.
+ * Used when explicitly connecting with a token.
+ */
+export function setCachedToken(token: string, apiBase: string): void {
+  cachedToken = token;
+  cachedApiBase = apiBase;
+}
+
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestOptions = {}

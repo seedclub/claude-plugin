@@ -20952,6 +20952,10 @@ async function clearCredentials() {
   cachedApiBase = null;
   await clearStoredToken();
 }
+function setCachedToken(token, apiBase) {
+  cachedToken = token;
+  cachedApiBase = apiBase;
+}
 async function apiRequest(endpoint, options = {}) {
   const { method = "GET", body, params } = options;
   const token = await getAuthToken();
@@ -21759,6 +21763,17 @@ var tools = [
       type: "object",
       properties: {}
     }
+  },
+  {
+    name: "seed_connect",
+    description: "Connect to Seed Network by providing an API token. Verifies the token against the API and stores it for future use.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        token: { type: "string", description: "Seed Network API token (starts with sn_)" }
+      },
+      required: ["token"]
+    }
   }
 ];
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -21853,9 +21868,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         } else {
           result = {
             authenticated: false,
-            message: "No stored credentials. Next API call will trigger browser authentication."
+            message: "No stored credentials. Use /connect with a token or run any API call to trigger browser authentication."
           };
         }
+        break;
+      }
+      case "seed_connect": {
+        const connectToken = args.token;
+        if (!connectToken || !connectToken.startsWith("sn_")) {
+          result = {
+            error: "Invalid token format. Seed Network tokens start with 'sn_'."
+          };
+          break;
+        }
+        const connectApiBase = getApiBase();
+        await storeToken(connectToken, "pending", connectApiBase);
+        setCachedToken(connectToken, connectApiBase);
+        const verifyResult = await getCurrentUser();
+        if ("error" in verifyResult) {
+          await clearCredentials();
+          result = {
+            error: "Token verification failed. The token may be invalid or expired.",
+            details: verifyResult.error
+          };
+          break;
+        }
+        await storeToken(connectToken, verifyResult.email, connectApiBase);
+        result = {
+          success: true,
+          message: "Connected to Seed Network.",
+          email: verifyResult.email,
+          name: verifyResult.name,
+          apiBase: connectApiBase
+        };
         break;
       }
       default:

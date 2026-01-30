@@ -12,8 +12,8 @@ import { createCompany, updateCompany, getCompany, listCompanies, searchCompanie
 import { saveResearch, getResearch, queryResearch, linkResearch } from "./tools/research.js";
 import { addEnrichment, getEnrichments, cancelEnrichment } from "./tools/enrichments.js";
 import { getCurrentUser, getSyncStatus } from "./tools/utility.js";
-import { clearCredentials } from "./api-client.js";
-import { getStoredToken, AuthRequiredError } from "./auth.js";
+import { clearCredentials, setCachedToken } from "./api-client.js";
+import { getStoredToken, storeToken, getApiBase, AuthRequiredError } from "./auth.js";
 
 const server = new Server(
   {
@@ -361,6 +361,17 @@ const tools = [
       type: "object" as const,
       properties: {}
     }
+  },
+  {
+    name: "seed_connect",
+    description: "Connect to Seed Network by providing an API token. Verifies the token against the API and stores it for future use.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        token: { type: "string", description: "Seed Network API token (starts with sn_)" }
+      },
+      required: ["token"]
+    }
   }
 ];
 
@@ -466,9 +477,51 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         } else {
           result = {
             authenticated: false,
-            message: "No stored credentials. Next API call will trigger browser authentication.",
+            message: "No stored credentials. Use /connect with a token or run any API call to trigger browser authentication.",
           };
         }
+        break;
+      }
+
+      case "seed_connect": {
+        const connectToken = (args as { token: string }).token;
+
+        if (!connectToken || !connectToken.startsWith("sn_")) {
+          result = {
+            error: "Invalid token format. Seed Network tokens start with 'sn_'.",
+          };
+          break;
+        }
+
+        const connectApiBase = getApiBase();
+
+        // Store token and update the api client cache so getCurrentUser() uses it
+        await storeToken(connectToken, "pending", connectApiBase);
+        setCachedToken(connectToken, connectApiBase);
+
+        // Verify by calling through the existing api client
+        const verifyResult = await getCurrentUser();
+
+        if ("error" in verifyResult) {
+          // Verification failed — roll back stored credentials
+          await clearCredentials();
+          result = {
+            error: "Token verification failed. The token may be invalid or expired.",
+            details: verifyResult.error,
+          };
+          break;
+        }
+
+        // Update stored token with the actual email now that we know it
+        await storeToken(connectToken, verifyResult.email, connectApiBase);
+
+        result = {
+          success: true,
+          message: "Connected to Seed Network.",
+          email: verifyResult.email,
+          name: verifyResult.name,
+          apiBase: connectApiBase,
+        };
         break;
       }
 
