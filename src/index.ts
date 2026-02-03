@@ -9,6 +9,7 @@ import {
 
 import { createDeal, updateDeal, getDeal, listDeals, searchDeals } from "./tools/deals.js";
 import { createCompany, updateCompany, getCompany, listCompanies, searchCompanies } from "./tools/companies.js";
+import { createSignal, batchCreateSignals, getSignal, listSignals, searchSignals, deleteSignal, addSignalRelation } from "./tools/signals.js";
 import { saveResearch, getResearch, queryResearch, linkResearch } from "./tools/research.js";
 import { addEnrichment, getEnrichments, cancelEnrichment } from "./tools/enrichments.js";
 import { getCurrentUser, getSyncStatus } from "./tools/utility.js";
@@ -198,6 +199,115 @@ const tools = [
         limit: { type: "number", description: "Maximum number of results" }
       },
       required: ["query"]
+    }
+  },
+
+  // Signal Operations
+  {
+    name: "create_signal",
+    description: "Create a new signal in Seed Network. Signals track entities worth watching: Twitter accounts, blogs, topics, people, etc.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        type: {
+          type: "string",
+          enum: ["twitter_account", "company", "person", "blog", "github_profile", "topic", "newsletter", "podcast", "subreddit", "custom"],
+          description: "Signal type"
+        },
+        name: { type: "string", description: "Display name" },
+        description: { type: "string", description: "Short description" },
+        externalUrl: { type: "string", description: "Link to the tracked entity" },
+        imageUrl: { type: "string", description: "Avatar/logo URL" },
+        tags: { type: "array", items: { type: "string" }, description: "Freeform tags for clustering" },
+        metadata: { type: "object", description: "Type-specific flexible fields" }
+      },
+      required: ["type", "name"]
+    }
+  },
+  {
+    name: "batch_create_signals",
+    description: "Create multiple signals at once. Useful for importing lists of accounts, topics, etc.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        signals: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string", description: "Signal type" },
+              name: { type: "string", description: "Display name" },
+              description: { type: "string", description: "Short description" },
+              externalUrl: { type: "string", description: "Link to the tracked entity" },
+              imageUrl: { type: "string", description: "Avatar/logo URL" },
+              tags: { type: "array", items: { type: "string" }, description: "Tags" },
+              metadata: { type: "object", description: "Type-specific fields" }
+            },
+            required: ["type", "name"]
+          },
+          description: "Array of signals to create"
+        }
+      },
+      required: ["signals"]
+    }
+  },
+  {
+    name: "get_signal",
+    description: "Get a specific signal by ID or slug.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        signalId: { type: "string", description: "Signal ID" },
+        slug: { type: "string", description: "Signal slug" }
+      }
+    }
+  },
+  {
+    name: "list_signals",
+    description: "List signals with optional filters by type or tag.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        type: { type: "string", description: "Filter by signal type" },
+        tag: { type: "string", description: "Filter by tag" },
+        limit: { type: "number", description: "Maximum number of results" }
+      }
+    }
+  },
+  {
+    name: "search_signals",
+    description: "Full-text search across signals. Searches name, description, and slug.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Search query" },
+        limit: { type: "number", description: "Maximum number of results" }
+      },
+      required: ["query"]
+    }
+  },
+  {
+    name: "delete_signal",
+    description: "Delete a signal by ID. Only the creator or a curator can delete.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        signalId: { type: "string", description: "ID of the signal to delete" }
+      },
+      required: ["signalId"]
+    }
+  },
+  {
+    name: "add_signal_relation",
+    description: "Create a relation between two signals (e.g., 'founded_by', 'works_at', 'covers_topic').",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        sourceSignalId: { type: "string", description: "Source signal ID" },
+        targetSignalId: { type: "string", description: "Target signal ID" },
+        relationType: { type: "string", description: "Relation type (e.g., 'founded_by', 'works_at', 'related_to', 'covers_topic')" }
+      },
+      required: ["sourceSignalId", "targetSignalId", "relationType"]
     }
   },
 
@@ -420,6 +530,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case "search_companies":
         result = await searchCompanies(args as Parameters<typeof searchCompanies>[0]);
+        break;
+
+      // Signal operations
+      case "create_signal":
+        result = await createSignal(args as Parameters<typeof createSignal>[0]);
+        break;
+      case "batch_create_signals":
+        result = await batchCreateSignals(args as Parameters<typeof batchCreateSignals>[0]);
+        break;
+      case "get_signal":
+        result = await getSignal(args as Parameters<typeof getSignal>[0]);
+        break;
+      case "list_signals":
+        result = await listSignals(args as Parameters<typeof listSignals>[0]);
+        break;
+      case "search_signals":
+        result = await searchSignals(args as Parameters<typeof searchSignals>[0]);
+        break;
+      case "delete_signal":
+        result = await deleteSignal(args as Parameters<typeof deleteSignal>[0]);
+        break;
+      case "add_signal_relation":
+        result = await addSignalRelation(args as Parameters<typeof addSignalRelation>[0]);
         break;
 
       // Research operations

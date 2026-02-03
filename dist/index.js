@@ -21232,6 +21232,146 @@ async function searchCompanies(args) {
   }
 }
 
+// src/tools/signals.ts
+async function createSignal(args) {
+  try {
+    const response = await api.post("/signals", {
+      type: args.type,
+      name: args.name,
+      description: args.description,
+      externalUrl: args.externalUrl,
+      imageUrl: args.imageUrl,
+      tags: args.tags,
+      metadata: args.metadata
+    });
+    return {
+      id: response.signal.id,
+      type: response.signal.type,
+      name: response.signal.name,
+      slug: response.signal.slug,
+      tags: response.signal.tags,
+      createdAt: response.signal.createdAt,
+      message: response.message
+    };
+  } catch (error2) {
+    if (error2 instanceof ApiError) {
+      return { error: error2.message, status: error2.status };
+    }
+    throw error2;
+  }
+}
+async function batchCreateSignals(args) {
+  try {
+    const response = await api.post("/signals", {
+      signals: args.signals
+    });
+    return {
+      signals: response.signals.map((s) => ({
+        id: s.id,
+        type: s.type,
+        name: s.name,
+        slug: s.slug,
+        tags: s.tags
+      })),
+      count: response.signals.length,
+      message: response.message
+    };
+  } catch (error2) {
+    if (error2 instanceof ApiError) {
+      return { error: error2.message, status: error2.status };
+    }
+    throw error2;
+  }
+}
+async function getSignal(args) {
+  try {
+    const params = {};
+    if (args.signalId) params.id = args.signalId;
+    if (args.slug) params.slug = args.slug;
+    const response = await api.get("/signals", params);
+    return { signal: response.signal };
+  } catch (error2) {
+    if (error2 instanceof ApiError) {
+      return { error: error2.message, status: error2.status };
+    }
+    throw error2;
+  }
+}
+async function listSignals(args) {
+  try {
+    const response = await api.get("/signals", {
+      type: args.type,
+      tag: args.tag,
+      limit: args.limit
+    });
+    return {
+      signals: response.signals,
+      total: response.total
+    };
+  } catch (error2) {
+    if (error2 instanceof ApiError) {
+      return { error: error2.message, status: error2.status };
+    }
+    throw error2;
+  }
+}
+async function searchSignals(args) {
+  try {
+    const response = await api.get("/signals", {
+      search: args.query,
+      limit: args.limit
+    });
+    return {
+      signals: response.signals,
+      total: response.total,
+      query: args.query
+    };
+  } catch (error2) {
+    if (error2 instanceof ApiError) {
+      return { error: error2.message, status: error2.status };
+    }
+    throw error2;
+  }
+}
+async function deleteSignal(args) {
+  try {
+    const response = await api.delete(
+      "/signals",
+      { id: args.signalId }
+    );
+    return {
+      success: response.success,
+      message: response.message
+    };
+  } catch (error2) {
+    if (error2 instanceof ApiError) {
+      return { error: error2.message, status: error2.status };
+    }
+    throw error2;
+  }
+}
+async function addSignalRelation(args) {
+  try {
+    const response = await api.post("/signals/relations", {
+      sourceSignalId: args.sourceSignalId,
+      targetSignalId: args.targetSignalId,
+      relationType: args.relationType
+    });
+    return {
+      relationId: response.relation.id,
+      sourceSignalId: response.relation.sourceSignalId,
+      targetSignalId: response.relation.targetSignalId,
+      relationType: response.relation.relationType,
+      message: response.message
+    };
+  } catch (error2) {
+    if (error2 instanceof ApiError) {
+      return { error: error2.message, status: error2.status };
+    }
+    throw error2;
+  }
+}
+
 // src/tools/research.ts
 async function saveResearch(args) {
   try {
@@ -21606,6 +21746,114 @@ var tools = [
       required: ["query"]
     }
   },
+  // Signal Operations
+  {
+    name: "create_signal",
+    description: "Create a new signal in Seed Network. Signals track entities worth watching: Twitter accounts, blogs, topics, people, etc.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        type: {
+          type: "string",
+          enum: ["twitter_account", "company", "person", "blog", "github_profile", "topic", "newsletter", "podcast", "subreddit", "custom"],
+          description: "Signal type"
+        },
+        name: { type: "string", description: "Display name" },
+        description: { type: "string", description: "Short description" },
+        externalUrl: { type: "string", description: "Link to the tracked entity" },
+        imageUrl: { type: "string", description: "Avatar/logo URL" },
+        tags: { type: "array", items: { type: "string" }, description: "Freeform tags for clustering" },
+        metadata: { type: "object", description: "Type-specific flexible fields" }
+      },
+      required: ["type", "name"]
+    }
+  },
+  {
+    name: "batch_create_signals",
+    description: "Create multiple signals at once. Useful for importing lists of accounts, topics, etc.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        signals: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string", description: "Signal type" },
+              name: { type: "string", description: "Display name" },
+              description: { type: "string", description: "Short description" },
+              externalUrl: { type: "string", description: "Link to the tracked entity" },
+              imageUrl: { type: "string", description: "Avatar/logo URL" },
+              tags: { type: "array", items: { type: "string" }, description: "Tags" },
+              metadata: { type: "object", description: "Type-specific fields" }
+            },
+            required: ["type", "name"]
+          },
+          description: "Array of signals to create"
+        }
+      },
+      required: ["signals"]
+    }
+  },
+  {
+    name: "get_signal",
+    description: "Get a specific signal by ID or slug.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        signalId: { type: "string", description: "Signal ID" },
+        slug: { type: "string", description: "Signal slug" }
+      }
+    }
+  },
+  {
+    name: "list_signals",
+    description: "List signals with optional filters by type or tag.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        type: { type: "string", description: "Filter by signal type" },
+        tag: { type: "string", description: "Filter by tag" },
+        limit: { type: "number", description: "Maximum number of results" }
+      }
+    }
+  },
+  {
+    name: "search_signals",
+    description: "Full-text search across signals. Searches name, description, and slug.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query" },
+        limit: { type: "number", description: "Maximum number of results" }
+      },
+      required: ["query"]
+    }
+  },
+  {
+    name: "delete_signal",
+    description: "Delete a signal by ID. Only the creator or a curator can delete.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        signalId: { type: "string", description: "ID of the signal to delete" }
+      },
+      required: ["signalId"]
+    }
+  },
+  {
+    name: "add_signal_relation",
+    description: "Create a relation between two signals (e.g., 'founded_by', 'works_at', 'covers_topic').",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sourceSignalId: { type: "string", description: "Source signal ID" },
+        targetSignalId: { type: "string", description: "Target signal ID" },
+        relationType: { type: "string", description: "Relation type (e.g., 'founded_by', 'works_at', 'related_to', 'covers_topic')" }
+      },
+      required: ["sourceSignalId", "targetSignalId", "relationType"]
+    }
+  },
   // Research Operations
   {
     name: "save_research",
@@ -21815,6 +22063,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case "search_companies":
         result = await searchCompanies(args);
+        break;
+      // Signal operations
+      case "create_signal":
+        result = await createSignal(args);
+        break;
+      case "batch_create_signals":
+        result = await batchCreateSignals(args);
+        break;
+      case "get_signal":
+        result = await getSignal(args);
+        break;
+      case "list_signals":
+        result = await listSignals(args);
+        break;
+      case "search_signals":
+        result = await searchSignals(args);
+        break;
+      case "delete_signal":
+        result = await deleteSignal(args);
+        break;
+      case "add_signal_relation":
+        result = await addSignalRelation(args);
         break;
       // Research operations
       case "save_research":
