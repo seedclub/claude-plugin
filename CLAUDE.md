@@ -83,3 +83,34 @@ Research artifacts are raw information collected during sourcing. Deals are stru
 ### Enrichments
 
 Enrichments are submitted changes to existing deals/companies that go through curator review via GitHub PR before being applied.
+
+### Direct API Access for Bulk Operations
+
+For bulk operations (importing hundreds+ of signals, etc.), calling MCP tools repeatedly is inefficient — each call consumes context and requires permission approval. Instead, use `curl` directly:
+
+- **Token location:** `~/.config/seed-network/token` (JSON with `token` and `apiBase` fields)
+- **Endpoint pattern:** All MCP tool endpoints map to `{apiBase}/api/mcp/{path}`
+- **Auth:** `Authorization: Bearer {token}` header
+
+Example — bulk create signals:
+```bash
+TOKEN=$(python3 -c "import json; print(json.load(open('$HOME/.config/seed-network/token'))['token'])")
+API_BASE=$(python3 -c "import json; print(json.load(open('$HOME/.config/seed-network/token')).get('apiBase', 'https://beta.seedclub.com'))")
+
+curl -s -X POST "${API_BASE}/api/mcp/signals" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d @payload.json
+```
+
+Key endpoints:
+| Tool | Method | Path |
+|------|--------|------|
+| `create_signal` / `batch_create_signals` | POST | `/api/mcp/signals` |
+| `list_signals` / `get_signal` | GET | `/api/mcp/signals` |
+| `delete_signal` | DELETE | `/api/mcp/signals` |
+| `create_deal` | POST | `/api/mcp/deals` |
+| `list_deals` | GET | `/api/mcp/deals` |
+| `save_research` | POST | `/api/mcp/research` |
+
+The signals endpoint accepts the full payload in one request — no batching needed.

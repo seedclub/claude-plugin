@@ -21563,6 +21563,168 @@ async function getSyncStatus() {
   }
 }
 
+// src/tools/events.ts
+async function createEvent(args) {
+  try {
+    const response = await api.post("/events", {
+      signalId: args.signalId,
+      type: args.type,
+      title: args.title,
+      summary: args.summary,
+      relatedSignalIds: args.relatedSignalIds,
+      sourceUrl: args.sourceUrl,
+      sourceUrls: args.sourceUrls,
+      metadata: args.metadata,
+      confidence: args.confidence,
+      importance: args.importance,
+      dedupeKey: args.dedupeKey,
+      occurredAt: args.occurredAt,
+      source: args.source || "agent"
+    });
+    return {
+      id: response.event.id,
+      signalId: response.event.signalId,
+      type: response.event.type,
+      title: response.event.title,
+      duplicate: response.duplicate || false,
+      message: response.message
+    };
+  } catch (error2) {
+    if (error2 instanceof ApiError) {
+      return { error: error2.message, status: error2.status };
+    }
+    throw error2;
+  }
+}
+async function batchCreateEvents(args) {
+  try {
+    const response = await api.post("/events", {
+      events: args.events.map((e) => ({
+        ...e,
+        source: e.source || "agent"
+      }))
+    });
+    return {
+      created: response.created.map((e) => ({
+        id: e.id,
+        signalId: e.signalId,
+        type: e.type,
+        title: e.title
+      })),
+      duplicatesSkipped: response.duplicates.length,
+      message: response.message
+    };
+  } catch (error2) {
+    if (error2 instanceof ApiError) {
+      return { error: error2.message, status: error2.status };
+    }
+    throw error2;
+  }
+}
+async function listEvents(args) {
+  try {
+    const params = {
+      limit: args.limit,
+      cursor: args.cursor
+    };
+    if (args.signalId) {
+      params.signalId = args.signalId;
+    } else if (args.signalIds && args.signalIds.length > 0) {
+      params.signalIds = args.signalIds.join(",");
+    }
+    if (args.type) params.type = args.type;
+    if (args.since) params.since = args.since;
+    if (args.until) params.until = args.until;
+    const response = await api.get("/events", params);
+    return {
+      events: response.events.map((e) => ({
+        id: e.id,
+        signalId: e.signalId,
+        type: e.type,
+        title: e.title,
+        summary: e.summary,
+        sourceUrl: e.sourceUrl,
+        importance: e.importance,
+        createdAt: e.createdAt,
+        signalName: e.signal?.name,
+        signalType: e.signal?.type
+      })),
+      nextCursor: response.nextCursor,
+      hasMore: response.hasMore
+    };
+  } catch (error2) {
+    if (error2 instanceof ApiError) {
+      return { error: error2.message, status: error2.status };
+    }
+    throw error2;
+  }
+}
+async function getSignalsToTend(args) {
+  try {
+    const response = await api.get("/signals/tend", {
+      limit: args.limit,
+      priority: args.priority
+    });
+    return {
+      signals: response.signals.map((s) => ({
+        id: s.id,
+        name: s.name,
+        type: s.type,
+        slug: s.slug,
+        externalUrl: s.externalUrl,
+        metadata: s.metadata,
+        lastTendedAt: s.tendingStatus?.lastTendedAt,
+        priority: s.tendingStatus?.priority
+      })),
+      total: response.total
+    };
+  } catch (error2) {
+    if (error2 instanceof ApiError) {
+      return { error: error2.message, status: error2.status };
+    }
+    throw error2;
+  }
+}
+async function markSignalTended(args) {
+  try {
+    const response = await api.post("/signals/tend", {
+      signalId: args.signalId,
+      error: args.error
+    });
+    return {
+      success: response.success,
+      signalId: args.signalId,
+      lastTendedAt: response.tendingStatus?.lastTendedAt,
+      message: response.message
+    };
+  } catch (error2) {
+    if (error2 instanceof ApiError) {
+      return { error: error2.message, status: error2.status };
+    }
+    throw error2;
+  }
+}
+async function batchMarkSignalsTended(args) {
+  try {
+    const response = await api.post("/signals/tend", {
+      signals: args.signals
+    });
+    return {
+      results: response.results.map((r) => ({
+        signalId: r.signalId,
+        success: r.success,
+        error: r.error
+      })),
+      message: response.message
+    };
+  } catch (error2) {
+    if (error2 instanceof ApiError) {
+      return { error: error2.message, status: error2.status };
+    }
+    throw error2;
+  }
+}
+
 // src/index.ts
 var server = new Server(
   {
@@ -21978,6 +22140,138 @@ var tools = [
       required: ["enrichmentId"]
     }
   },
+  // Event Operations
+  {
+    name: "create_event",
+    description: "Create a single event for a signal. Events track occurrences like fundraising, product launches, key hires, etc.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        signalId: { type: "string", description: "ID of the signal this event is about" },
+        type: {
+          type: "string",
+          enum: [
+            "fundraising_announced",
+            "acquisition",
+            "product_launch",
+            "key_hire",
+            "partnership",
+            "media_coverage",
+            "regulatory_filing",
+            "social_activity",
+            "sentiment_change",
+            "market_signal",
+            "endorsement",
+            "insight",
+            "custom"
+          ],
+          description: "Event type category"
+        },
+        title: { type: "string", description: "Event title (max 500 chars)" },
+        summary: { type: "string", description: "Detailed summary (max 2000 chars)" },
+        sourceUrl: { type: "string", description: "Primary source URL" },
+        sourceUrls: { type: "array", items: { type: "string" }, description: "Additional source URLs" },
+        metadata: { type: "object", description: "Type-specific metadata" },
+        confidence: { type: "number", description: "Confidence score 0.0-1.0" },
+        importance: { type: "integer", description: "Importance score 0-100" },
+        dedupeKey: { type: "string", description: "Unique key for deduplication (e.g., signalId:type:date)" },
+        occurredAt: { type: "string", description: "When the event occurred (ISO 8601)" }
+      },
+      required: ["signalId", "type", "title"]
+    }
+  },
+  {
+    name: "batch_create_events",
+    description: "Create multiple events at once (up to 50). Useful for bulk event creation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        events: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              signalId: { type: "string", description: "Signal ID" },
+              type: { type: "string", description: "Event type" },
+              title: { type: "string", description: "Event title" },
+              summary: { type: "string", description: "Event summary" },
+              sourceUrl: { type: "string", description: "Source URL" },
+              sourceUrls: { type: "array", items: { type: "string" } },
+              metadata: { type: "object" },
+              confidence: { type: "number" },
+              importance: { type: "integer" },
+              dedupeKey: { type: "string" },
+              occurredAt: { type: "string" }
+            },
+            required: ["signalId", "type", "title"]
+          },
+          description: "Array of events to create (max 50)"
+        }
+      },
+      required: ["events"]
+    }
+  },
+  {
+    name: "list_events",
+    description: "Query events by signal, type, or date range.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        signalId: { type: "string", description: "Filter by specific signal ID" },
+        signalIds: { type: "array", items: { type: "string" }, description: "Filter by multiple signal IDs" },
+        type: { type: "string", description: "Filter by event type" },
+        since: { type: "string", description: "Only events after this date (ISO 8601)" },
+        until: { type: "string", description: "Only events before this date (ISO 8601)" },
+        limit: { type: "number", description: "Max results (default 50, max 100)" },
+        cursor: { type: "string", description: "Cursor for pagination" }
+      }
+    }
+  },
+  {
+    name: "get_signals_to_tend",
+    description: "Get signals that are due for tending (haven't been checked recently). Use this before running the tend workflow.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Max signals to return (default 20, max 100)" },
+        priority: { type: "number", description: "Minimum priority threshold (0-100)" }
+      }
+    }
+  },
+  {
+    name: "mark_signal_tended",
+    description: "Mark a signal as tended after processing. Call this after checking a signal for events.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        signalId: { type: "string", description: "ID of the signal that was tended" },
+        error: { type: "string", description: "Error message if tending failed" }
+      },
+      required: ["signalId"]
+    }
+  },
+  {
+    name: "batch_mark_signals_tended",
+    description: "Mark multiple signals as tended at once.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        signals: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              signalId: { type: "string", description: "Signal ID" },
+              error: { type: "string", description: "Error message if failed" }
+            },
+            required: ["signalId"]
+          },
+          description: "Array of signals to mark as tended"
+        }
+      },
+      required: ["signals"]
+    }
+  },
   // Utility Operations
   {
     name: "get_current_user",
@@ -22108,6 +22402,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         break;
       case "cancel_enrichment":
         result = await cancelEnrichment(args);
+        break;
+      // Event operations
+      case "create_event":
+        result = await createEvent(args);
+        break;
+      case "batch_create_events":
+        result = await batchCreateEvents(args);
+        break;
+      case "list_events":
+        result = await listEvents(args);
+        break;
+      case "get_signals_to_tend":
+        result = await getSignalsToTend(args);
+        break;
+      case "mark_signal_tended":
+        result = await markSignalTended(args);
+        break;
+      case "batch_mark_signals_tended":
+        result = await batchMarkSignalsTended(args);
         break;
       // Utility operations
       case "get_current_user":
