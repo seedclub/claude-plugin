@@ -14,6 +14,7 @@ import { saveResearch, getResearch, queryResearch, linkResearch } from "./tools/
 import { addEnrichment, getEnrichments, cancelEnrichment } from "./tools/enrichments.js";
 import { getCurrentUser, getSyncStatus } from "./tools/utility.js";
 import { createEvent, batchCreateEvents, listEvents, getSignalsToTend, markSignalTended, batchMarkSignalsTended } from "./tools/events.js";
+import { twitterCheck, twitterWhoami, twitterFollowing, twitterFollowers, twitterBookmarks, twitterNews, twitterSearch, twitterLikes, twitterRead } from "./tools/twitter.js";
 import { clearCredentials, setCachedToken } from "./api-client.js";
 import { getStoredToken, storeToken, getApiBase, AuthRequiredError } from "./auth.js";
 
@@ -607,6 +608,114 @@ const tools = [
       },
       required: ["token"]
     }
+  },
+
+  // Twitter Operations (via @steipete/bird)
+  {
+    name: "twitter_check",
+    description: "Verify Twitter/X credentials and show the logged-in user. Reads cookies from Safari, Chrome, or Firefox.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {}
+    }
+  },
+  {
+    name: "twitter_whoami",
+    description: "Get the current Twitter/X user's info (id, username, name).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {}
+    }
+  },
+  {
+    name: "twitter_following",
+    description: "Get the list of accounts a user follows on Twitter/X. Defaults to the authenticated user.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        username: { type: "string", description: "Username to look up (without @). Defaults to current user." },
+        userId: { type: "string", description: "User ID to look up (alternative to username)" },
+        count: { type: "number", description: "Number of users to fetch (default: 50)" },
+        all: { type: "boolean", description: "Fetch all following (paginate until complete)" },
+        cursor: { type: "string", description: "Pagination cursor from previous request" }
+      }
+    }
+  },
+  {
+    name: "twitter_followers",
+    description: "Get the list of accounts that follow a user on Twitter/X. Defaults to the authenticated user.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        username: { type: "string", description: "Username to look up (without @). Defaults to current user." },
+        userId: { type: "string", description: "User ID to look up (alternative to username)" },
+        count: { type: "number", description: "Number of users to fetch (default: 50)" },
+        cursor: { type: "string", description: "Pagination cursor from previous request" }
+      }
+    }
+  },
+  {
+    name: "twitter_bookmarks",
+    description: "Get the authenticated user's bookmarked tweets on Twitter/X.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        count: { type: "number", description: "Number of bookmarks to fetch (default: 20)" },
+        all: { type: "boolean", description: "Fetch all bookmarks (paginate until complete)" },
+        cursor: { type: "string", description: "Pagination cursor from previous request" }
+      }
+    }
+  },
+  {
+    name: "twitter_news",
+    description: "Get trending news and topics from Twitter/X Explore page.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        count: { type: "number", description: "Number of news items to fetch (default: 10)" },
+        tab: { type: "string", enum: ["forYou", "news", "sports", "entertainment"], description: "Specific tab to fetch from" },
+        tabs: { type: "array", items: { type: "string" }, description: "Multiple tabs to fetch from" },
+        withTweets: { type: "boolean", description: "Include related tweets for each news item" }
+      }
+    }
+  },
+  {
+    name: "twitter_search",
+    description: "Search for tweets on Twitter/X by query.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Search query" },
+        count: { type: "number", description: "Number of tweets to fetch (default: 20)" },
+        cursor: { type: "string", description: "Pagination cursor from previous request" }
+      },
+      required: ["query"]
+    }
+  },
+  {
+    name: "twitter_likes",
+    description: "Get the authenticated user's liked tweets on Twitter/X.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        count: { type: "number", description: "Number of likes to fetch (default: 20)" },
+        all: { type: "boolean", description: "Fetch all likes (paginate until complete)" },
+        cursor: { type: "string", description: "Pagination cursor from previous request" }
+      }
+    }
+  },
+  {
+    name: "twitter_read",
+    description: "Read a specific tweet by ID or URL. Optionally fetch replies or full thread.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tweetId: { type: "string", description: "Tweet ID to read" },
+        url: { type: "string", description: "Tweet URL (alternative to tweetId)" },
+        includeReplies: { type: "boolean", description: "Include replies to the tweet" },
+        includeThread: { type: "boolean", description: "Include the full conversation thread" }
+      }
+    }
   }
 ];
 
@@ -802,6 +911,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
         break;
       }
+
+      // Twitter operations
+      case "twitter_check":
+        result = await twitterCheck();
+        break;
+      case "twitter_whoami":
+        result = await twitterWhoami();
+        break;
+      case "twitter_following":
+        result = await twitterFollowing(args as Parameters<typeof twitterFollowing>[0]);
+        break;
+      case "twitter_followers":
+        result = await twitterFollowers(args as Parameters<typeof twitterFollowers>[0]);
+        break;
+      case "twitter_bookmarks":
+        result = await twitterBookmarks(args as Parameters<typeof twitterBookmarks>[0]);
+        break;
+      case "twitter_news":
+        result = await twitterNews(args as Parameters<typeof twitterNews>[0]);
+        break;
+      case "twitter_search":
+        result = await twitterSearch(args as Parameters<typeof twitterSearch>[0]);
+        break;
+      case "twitter_likes":
+        result = await twitterLikes(args as Parameters<typeof twitterLikes>[0]);
+        break;
+      case "twitter_read":
+        result = await twitterRead(args as Parameters<typeof twitterRead>[0]);
+        break;
 
       default:
         return {

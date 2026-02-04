@@ -4,7 +4,9 @@
       "command": "node",
       "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js"],
       "env": {
-        "SEED_NETWORK_API": "${SEED_NETWORK_API:-https://beta.seedclub.com}"
+        "SEED_NETWORK_API": "${SEED_NETWORK_API:-https://beta.seedclub.com}",
+        "CHROME_PROFILE": "${CHROME_PROFILE:-}",
+        "FIREFOX_PROFILE": "${FIREFOX_PROFILE:-}"
       }
     }
   }

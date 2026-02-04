@@ -3222,8 +3222,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path) {
-      let input = path;
+    function removeDotSegments(path14) {
+      let input = path14;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -3422,8 +3422,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path && path !== "/" ? path : void 0;
+        const [path14, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path14 && path14 !== "/" ? path14 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -6776,12 +6776,12 @@ var require_dist = __commonJS({
         throw new Error(`Unknown format "${name}"`);
       return f;
     };
-    function addFormats(ajv, list, fs, exportName) {
+    function addFormats(ajv, list, fs2, exportName) {
       var _a2;
       var _b;
       (_a2 = (_b = ajv.opts.code).formats) !== null && _a2 !== void 0 ? _a2 : _b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`;
       for (const f of list)
-        ajv.addFormat(f, fs[f]);
+        ajv.addFormat(f, fs2[f]);
     }
     module.exports = exports = formatsPlugin;
     Object.defineProperty(exports, "__esModule", { value: true });
@@ -7148,8 +7148,8 @@ function getErrorMap() {
 
 // node_modules/.pnpm/zod@4.3.5/node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path, errorMaps, issueData } = params;
-  const fullPath = [...path, ...issueData.path || []];
+  const { data, path: path14, errorMaps, issueData } = params;
+  const fullPath = [...path14, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -7264,11 +7264,11 @@ var errorUtil;
 
 // node_modules/.pnpm/zod@4.3.5/node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path, key) {
+  constructor(parent, value, path14, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path;
+    this._path = path14;
     this._key = key;
   }
   get path() {
@@ -10912,10 +10912,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path) {
-  if (!path)
+function getElementAtPath(obj, path14) {
+  if (!path14)
     return obj;
-  return path.reduce((acc, key) => acc?.[key], obj);
+  return path14.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -11298,11 +11298,11 @@ function aborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path, issues) {
+function prefixIssues(path14, issues) {
   return issues.map((iss) => {
     var _a2;
     (_a2 = iss).path ?? (_a2.path = []);
-    iss.path.unshift(path);
+    iss.path.unshift(path14);
     return iss;
   });
 }
@@ -21725,6 +21725,6858 @@ async function batchMarkSignalsTended(args) {
   }
 }
 
+// src/twitter-client.ts
+import { readdirSync as readdirSync2, statSync as statSync2, existsSync as existsSync9 } from "node:fs";
+import { join as join2 } from "node:path";
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromeSqlite/crypto.js
+import { createDecipheriv, pbkdf2Sync } from "node:crypto";
+var UTF8_DECODER = new TextDecoder("utf-8", { fatal: true });
+function deriveAes128CbcKeyFromPassword(password, options) {
+  return pbkdf2Sync(password, "saltysalt", options.iterations, 16, "sha1");
+}
+function decryptChromiumAes128CbcCookieValue(encryptedValue, keyCandidates, options) {
+  const buf = Buffer.from(encryptedValue);
+  if (buf.length < 3)
+    return null;
+  const prefix = buf.subarray(0, 3).toString("utf8");
+  const hasVersionPrefix = /^v\d\d$/.test(prefix);
+  if (!hasVersionPrefix) {
+    if (options.treatUnknownPrefixAsPlaintext === false)
+      return null;
+    return decodeCookieValueBytes(buf, false);
+  }
+  const ciphertext = buf.subarray(3);
+  if (!ciphertext.length)
+    return "";
+  for (const key of keyCandidates) {
+    const decrypted = tryDecryptAes128Cbc(ciphertext, key);
+    if (!decrypted)
+      continue;
+    const decoded = decodeCookieValueBytes(decrypted, options.stripHashPrefix);
+    if (decoded !== null)
+      return decoded;
+  }
+  return null;
+}
+function decryptChromiumAes256GcmCookieValue(encryptedValue, key, options) {
+  const buf = Buffer.from(encryptedValue);
+  if (buf.length < 3)
+    return null;
+  const prefix = buf.subarray(0, 3).toString("utf8");
+  if (!/^v\d\d$/.test(prefix))
+    return null;
+  const payload = buf.subarray(3);
+  if (payload.length < 12 + 16)
+    return null;
+  const nonce = payload.subarray(0, 12);
+  const authenticationTag = payload.subarray(payload.length - 16);
+  const ciphertext = payload.subarray(12, payload.length - 16);
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", key, nonce);
+    decipher.setAuthTag(authenticationTag);
+    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    return decodeCookieValueBytes(plaintext, options.stripHashPrefix);
+  } catch {
+    return null;
+  }
+}
+function tryDecryptAes128Cbc(ciphertext, key) {
+  try {
+    const iv = Buffer.alloc(16, 32);
+    const decipher = createDecipheriv("aes-128-cbc", key, iv);
+    decipher.setAutoPadding(false);
+    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    return removePkcs7Padding(plaintext);
+  } catch {
+    return null;
+  }
+}
+function removePkcs7Padding(value) {
+  if (!value.length)
+    return value;
+  const padding = value[value.length - 1];
+  if (!padding || padding > 16)
+    return value;
+  return value.subarray(0, value.length - padding);
+}
+function decodeCookieValueBytes(value, stripHashPrefix) {
+  const bytes = stripHashPrefix && value.length >= 32 ? value.subarray(32) : value;
+  try {
+    return stripLeadingControlChars(UTF8_DECODER.decode(bytes));
+  } catch {
+    return null;
+  }
+}
+function stripLeadingControlChars(value) {
+  let i = 0;
+  while (i < value.length && value.charCodeAt(i) < 32)
+    i += 1;
+  return value.slice(i);
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/util/exec.js
+import { spawn } from "node:child_process";
+async function execCapture(file2, args, options = {}) {
+  const timeoutMs = options.timeoutMs ?? 1e4;
+  const runOnce = (executable) => new Promise((resolve) => {
+    const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr2 = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr2 += chunk;
+    });
+    const timer = setTimeout(() => {
+      try {
+        child.kill("SIGKILL");
+      } catch {
+      }
+      resolve({ code: 124, stdout, stderr: `${stderr2}
+Timed out after ${timeoutMs}ms` });
+    }, timeoutMs);
+    timer.unref?.();
+    child.on("error", (error2) => {
+      clearTimeout(timer);
+      resolve({
+        code: 127,
+        stdout,
+        stderr: `${stderr2}
+${error2 instanceof Error ? error2.message : String(error2)}`
+      });
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({ code: code ?? 0, stdout, stderr: stderr2 });
+    });
+  });
+  const result = await runOnce(file2);
+  if (process.platform !== "win32")
+    return result;
+  const runOnceCmd = (cmd) => {
+    const quoted = [cmd, ...args.map(cmdQuote)].join(" ");
+    return new Promise((resolve) => {
+      const child = spawn("cmd.exe", ["/d", "/s", "/c", quoted], {
+        stdio: ["ignore", "pipe", "pipe"]
+      });
+      let stdout = "";
+      let stderr2 = "";
+      child.stdout.setEncoding("utf8");
+      child.stderr.setEncoding("utf8");
+      child.stdout.on("data", (chunk) => {
+        stdout += chunk;
+      });
+      child.stderr.on("data", (chunk) => {
+        stderr2 += chunk;
+      });
+      const timer = setTimeout(() => {
+        try {
+          child.kill("SIGKILL");
+        } catch {
+        }
+        resolve({ code: 124, stdout, stderr: `${stderr2}
+Timed out after ${timeoutMs}ms` });
+      }, timeoutMs);
+      timer.unref?.();
+      child.on("error", (error2) => {
+        clearTimeout(timer);
+        resolve({
+          code: 127,
+          stdout,
+          stderr: `${stderr2}
+${error2 instanceof Error ? error2.message : String(error2)}`
+        });
+      });
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        resolve({ code: code ?? 0, stdout, stderr: stderr2 });
+      });
+    });
+  };
+  const stderr = result.stderr.toLowerCase();
+  if (result.code === 127 && stderr.includes("enoent") && !file2.toLowerCase().endsWith(".cmd")) {
+    const cmdResult = await runOnceCmd(`${file2}.cmd`);
+    if (!(cmdResult.code === 127 && cmdResult.stderr.toLowerCase().includes("enoent")))
+      return cmdResult;
+  }
+  if (result.code === 127 && stderr.includes("enoent") && !file2.toLowerCase().endsWith(".bat")) {
+    const batResult = await runOnceCmd(`${file2}.bat`);
+    if (!(batResult.code === 127 && batResult.stderr.toLowerCase().includes("enoent")))
+      return batResult;
+  }
+  return result;
+}
+function cmdQuote(value) {
+  if (!value)
+    return '""';
+  if (!/[\t\s"&|<>^]/.test(value))
+    return value;
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromeSqlite/linuxKeyring.js
+async function getLinuxChromiumSafeStoragePassword(options) {
+  const warnings = [];
+  const overrideKey = options.app === "edge" ? "SWEET_COOKIE_EDGE_SAFE_STORAGE_PASSWORD" : "SWEET_COOKIE_CHROME_SAFE_STORAGE_PASSWORD";
+  const override = readEnv(overrideKey);
+  if (override !== void 0)
+    return { password: override, warnings };
+  const backend = options.backend ?? parseLinuxKeyringBackend() ?? chooseLinuxKeyringBackend();
+  if (backend === "basic")
+    return { password: "", warnings };
+  const service = options.app === "edge" ? "Microsoft Edge Safe Storage" : "Chrome Safe Storage";
+  const account = options.app === "edge" ? "Microsoft Edge" : "Chrome";
+  const folder = `${account} Keys`;
+  if (backend === "gnome") {
+    const res = await execCapture("secret-tool", ["lookup", "service", service, "account", account], { timeoutMs: 3e3 });
+    if (res.code === 0)
+      return { password: res.stdout.trim(), warnings };
+    warnings.push("Failed to read Linux keyring via secret-tool; v11 cookies may be unavailable.");
+    return { password: "", warnings };
+  }
+  const kdeVersion = (readEnv("KDE_SESSION_VERSION") ?? "").trim();
+  const serviceName = kdeVersion === "6" ? "org.kde.kwalletd6" : kdeVersion === "5" ? "org.kde.kwalletd5" : "org.kde.kwalletd";
+  const walletPath = kdeVersion === "6" ? "/modules/kwalletd6" : kdeVersion === "5" ? "/modules/kwalletd5" : "/modules/kwalletd";
+  const wallet = await getKWalletNetworkWallet(serviceName, walletPath);
+  const passwordRes = await execCapture("kwallet-query", ["--read-password", service, "--folder", folder, wallet], { timeoutMs: 3e3 });
+  if (passwordRes.code !== 0) {
+    warnings.push("Failed to read Linux keyring via kwallet-query; v11 cookies may be unavailable.");
+    return { password: "", warnings };
+  }
+  if (passwordRes.stdout.toLowerCase().startsWith("failed to read"))
+    return { password: "", warnings };
+  return { password: passwordRes.stdout.trim(), warnings };
+}
+async function getLinuxChromeSafeStoragePassword(options = {}) {
+  const args = { app: "chrome" };
+  if (options.backend !== void 0)
+    args.backend = options.backend;
+  return await getLinuxChromiumSafeStoragePassword(args);
+}
+function parseLinuxKeyringBackend() {
+  const raw = readEnv("SWEET_COOKIE_LINUX_KEYRING");
+  if (!raw)
+    return void 0;
+  const normalized = raw.toLowerCase();
+  if (normalized === "gnome")
+    return "gnome";
+  if (normalized === "kwallet")
+    return "kwallet";
+  if (normalized === "basic")
+    return "basic";
+  return void 0;
+}
+function chooseLinuxKeyringBackend() {
+  const xdg = readEnv("XDG_CURRENT_DESKTOP") ?? "";
+  const isKde = xdg.split(":").some((p) => p.trim().toLowerCase() === "kde") || !!readEnv("KDE_FULL_SESSION");
+  return isKde ? "kwallet" : "gnome";
+}
+async function getKWalletNetworkWallet(serviceName, walletPath) {
+  const res = await execCapture("dbus-send", [
+    "--session",
+    "--print-reply=literal",
+    `--dest=${serviceName}`,
+    walletPath,
+    "org.kde.KWallet.networkWallet"
+  ], { timeoutMs: 3e3 });
+  const fallback = "kdewallet";
+  if (res.code !== 0)
+    return fallback;
+  const raw = res.stdout.trim();
+  if (!raw)
+    return fallback;
+  return raw.replaceAll('"', "").trim() || fallback;
+}
+function readEnv(key) {
+  const value = process.env[key];
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed.length ? trimmed : void 0;
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromeSqlite/shared.js
+import { copyFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/util/expire.js
+function normalizeExpiration(expires) {
+  if (expires === void 0 || expires === null)
+    return void 0;
+  if (typeof expires === "bigint") {
+    if (expires <= 0n)
+      return void 0;
+    if (expires > 10000000000000n) {
+      return Number(expires / 1000000n - 11644473600n);
+    }
+    if (expires > 10000000000n) {
+      return Number(expires / 1000n);
+    }
+    return Number(expires);
+  }
+  if (!expires || Number.isNaN(expires))
+    return void 0;
+  const value = Number(expires);
+  if (value <= 0)
+    return void 0;
+  if (value > 1e13) {
+    return Math.round(value / 1e6 - 11644473600);
+  }
+  if (value > 1e10) {
+    return Math.round(value / 1e3);
+  }
+  return Math.round(value);
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/util/hostMatch.js
+function hostMatchesCookieDomain(host, cookieDomain) {
+  const normalizedHost = host.toLowerCase();
+  const normalizedDomain = cookieDomain.startsWith(".") ? cookieDomain.slice(1) : cookieDomain;
+  const domainLower = normalizedDomain.toLowerCase();
+  return normalizedHost === domainLower || normalizedHost.endsWith(`.${domainLower}`);
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/util/nodeSqlite.js
+var cached2 = null;
+function supportsReadBigInts() {
+  const [majorRaw, minorRaw] = process.versions.node.split(".");
+  const major = Number.parseInt(majorRaw ?? "", 10);
+  const minor = Number.parseInt(minorRaw ?? "", 10);
+  if (!Number.isFinite(major) || !Number.isFinite(minor))
+    return false;
+  if (major > 24)
+    return true;
+  if (major < 24)
+    return false;
+  return minor >= 4;
+}
+function shouldSuppressSqliteExperimentalWarning(warning, args) {
+  const message = typeof warning === "string" ? warning : warning instanceof Error ? warning.message : typeof warning?.message === "string" ? warning.message : null;
+  if (!message || !message.includes("SQLite is an experimental feature"))
+    return false;
+  const firstArg = args[0];
+  if (firstArg === "ExperimentalWarning")
+    return true;
+  if (typeof firstArg === "object" && firstArg) {
+    const type = firstArg.type;
+    if (type === "ExperimentalWarning")
+      return true;
+  }
+  if (warning instanceof Error && warning.name === "ExperimentalWarning")
+    return true;
+  return false;
+}
+async function importNodeSqlite() {
+  if (cached2)
+    return cached2;
+  const originalEmitWarning = process.emitWarning.bind(process);
+  process.emitWarning = ((warning, ...args) => {
+    if (shouldSuppressSqliteExperimentalWarning(warning, args))
+      return;
+    return originalEmitWarning(warning, ...args);
+  });
+  try {
+    cached2 = await import("node:sqlite");
+    return cached2;
+  } finally {
+    process.emitWarning = originalEmitWarning;
+  }
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/util/runtime.js
+function isBunRuntime() {
+  if (typeof process === "undefined")
+    return false;
+  const bunVersion = process.versions.bun;
+  return Boolean(typeof process.versions === "object" && typeof bunVersion === "string");
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromeSqlite/shared.js
+async function getCookiesFromChromeSqliteDb(options, origins, allowlistNames, decrypt) {
+  const warnings = [];
+  const tempDir = mkdtempSync(path.join(tmpdir(), "sweet-cookie-chrome-"));
+  const tempDbPath = path.join(tempDir, "Cookies");
+  try {
+    copyFileSync(options.dbPath, tempDbPath);
+    copySidecar(options.dbPath, `${tempDbPath}-wal`, "-wal");
+    copySidecar(options.dbPath, `${tempDbPath}-shm`, "-shm");
+  } catch (error2) {
+    rmSync(tempDir, { recursive: true, force: true });
+    warnings.push(`Failed to copy Chrome cookie DB: ${error2 instanceof Error ? error2.message : String(error2)}`);
+    return { cookies: [], warnings };
+  }
+  try {
+    const hosts = origins.map((o) => new URL(o).hostname);
+    const where = buildHostWhereClause(hosts, "host_key");
+    const metaVersion = await readChromiumMetaVersion(tempDbPath);
+    const stripHashPrefix = metaVersion >= 24;
+    const rowsResult = await readChromeRows(tempDbPath, where);
+    if (!rowsResult.ok) {
+      warnings.push(rowsResult.error);
+      return { cookies: [], warnings };
+    }
+    const collectOptions = {};
+    if (options.profile)
+      collectOptions.profile = options.profile;
+    if (options.includeExpired !== void 0)
+      collectOptions.includeExpired = options.includeExpired;
+    const cookies = collectChromeCookiesFromRows(rowsResult.rows, collectOptions, hosts, allowlistNames, (encryptedValue) => decrypt(encryptedValue, { stripHashPrefix }), warnings);
+    return { cookies: dedupeCookies(cookies), warnings };
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+function collectChromeCookiesFromRows(rows, options, hosts, allowlistNames, decrypt, warnings) {
+  const cookies = [];
+  const now = Math.floor(Date.now() / 1e3);
+  let warnedEncryptedType = false;
+  for (const row of rows) {
+    const name = typeof row.name === "string" ? row.name : null;
+    if (!name)
+      continue;
+    if (allowlistNames && allowlistNames.size > 0 && !allowlistNames.has(name))
+      continue;
+    const hostKey = typeof row.host_key === "string" ? row.host_key : null;
+    if (!hostKey)
+      continue;
+    if (!hostMatchesAny(hosts, hostKey))
+      continue;
+    const rowPath = typeof row.path === "string" ? row.path : "";
+    const valueString = typeof row.value === "string" ? row.value : null;
+    let value = valueString;
+    if (value === null || value.length === 0) {
+      const encryptedBytes = getEncryptedBytes(row);
+      if (!encryptedBytes) {
+        if (!warnedEncryptedType && row.encrypted_value !== void 0) {
+          warnings.push("Chrome cookie encrypted_value is in an unsupported type.");
+          warnedEncryptedType = true;
+        }
+        continue;
+      }
+      value = decrypt(encryptedBytes);
+    }
+    if (value === null)
+      continue;
+    const expiresRaw = typeof row.expires_utc === "number" || typeof row.expires_utc === "bigint" ? row.expires_utc : tryParseInt(row.expires_utc);
+    const expires = normalizeExpiration(expiresRaw ?? void 0);
+    if (!options.includeExpired) {
+      if (expires && expires < now)
+        continue;
+    }
+    const secure = row.is_secure === 1 || row.is_secure === 1n || row.is_secure === "1" || row.is_secure === true;
+    const httpOnly = row.is_httponly === 1 || row.is_httponly === 1n || row.is_httponly === "1" || row.is_httponly === true;
+    const sameSite = normalizeChromiumSameSite(row.samesite);
+    const source = { browser: "chrome" };
+    if (options.profile)
+      source.profile = options.profile;
+    const cookie = {
+      name,
+      value,
+      domain: hostKey.startsWith(".") ? hostKey.slice(1) : hostKey,
+      path: rowPath || "/",
+      secure,
+      httpOnly,
+      source
+    };
+    if (expires !== void 0)
+      cookie.expires = expires;
+    if (sameSite !== void 0)
+      cookie.sameSite = sameSite;
+    cookies.push(cookie);
+  }
+  return cookies;
+}
+function tryParseInt(value) {
+  if (typeof value === "bigint") {
+    const parsed2 = Number(value);
+    return Number.isFinite(parsed2) ? parsed2 : null;
+  }
+  if (typeof value !== "string")
+    return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+function normalizeChromiumSameSite(value) {
+  if (typeof value === "bigint") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? normalizeChromiumSameSite(parsed) : void 0;
+  }
+  if (typeof value === "number") {
+    if (value === 2)
+      return "Strict";
+    if (value === 1)
+      return "Lax";
+    if (value === 0)
+      return "None";
+    return void 0;
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isFinite(parsed))
+      return normalizeChromiumSameSite(parsed);
+    const normalized = value.toLowerCase();
+    if (normalized === "strict")
+      return "Strict";
+    if (normalized === "lax")
+      return "Lax";
+    if (normalized === "none" || normalized === "no_restriction")
+      return "None";
+  }
+  return void 0;
+}
+function getEncryptedBytes(row) {
+  const raw = row.encrypted_value;
+  if (raw instanceof Uint8Array)
+    return raw;
+  return null;
+}
+async function readChromiumMetaVersion(dbPath) {
+  const sql = `SELECT value FROM meta WHERE key = 'version'`;
+  const result = isBunRuntime() ? await queryNodeOrBun({ kind: "bun", dbPath, sql }) : await queryNodeOrBun({ kind: "node", dbPath, sql });
+  if (!result.ok)
+    return 0;
+  const first = result.rows[0];
+  const value = first?.value;
+  if (typeof value === "number")
+    return Math.floor(value);
+  if (typeof value === "bigint") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.floor(parsed) : 0;
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+async function readChromeRows(dbPath, where) {
+  const sqliteKind = isBunRuntime() ? "bun" : "node";
+  const sqliteLabel = sqliteKind === "bun" ? "bun:sqlite" : "node:sqlite";
+  const expiresCol = sqliteKind === "node" && !supportsReadBigInts() ? "CAST(expires_utc AS TEXT) AS expires_utc" : "expires_utc";
+  const sql = `SELECT name, value, host_key, path, ${expiresCol}, samesite, encrypted_value, is_secure AS is_secure, is_httponly AS is_httponly FROM cookies WHERE (${where}) ORDER BY expires_utc DESC;`;
+  const result = await queryNodeOrBun({ kind: sqliteKind, dbPath, sql });
+  if (result.ok)
+    return { ok: true, rows: result.rows };
+  return {
+    ok: false,
+    error: `${sqliteLabel} failed reading Chrome cookies (requires modern Chromium, e.g. Chrome >= 100): ${result.error}`
+  };
+}
+async function queryNodeOrBun(options) {
+  try {
+    if (options.kind === "node") {
+      const { DatabaseSync } = await importNodeSqlite();
+      const dbOptions = { readOnly: true };
+      if (supportsReadBigInts()) {
+        dbOptions.readBigInts = true;
+      }
+      const db2 = new DatabaseSync(options.dbPath, dbOptions);
+      try {
+        const rows = db2.prepare(options.sql).all();
+        return { ok: true, rows };
+      } finally {
+        db2.close();
+      }
+    }
+    const { Database } = await import("bun:sqlite");
+    const db = new Database(options.dbPath, { readonly: true });
+    try {
+      const rows = db.query(options.sql).all();
+      return { ok: true, rows };
+    } finally {
+      db.close();
+    }
+  } catch (error2) {
+    return { ok: false, error: error2 instanceof Error ? error2.message : String(error2) };
+  }
+}
+function copySidecar(sourceDbPath, target, suffix) {
+  const sidecar = `${sourceDbPath}${suffix}`;
+  if (!existsSync(sidecar))
+    return;
+  try {
+    copyFileSync(sidecar, target);
+  } catch {
+  }
+}
+function buildHostWhereClause(hosts, column) {
+  const clauses = [];
+  for (const host of hosts) {
+    for (const candidate of expandHostCandidates(host)) {
+      const escaped = sqlLiteral(candidate);
+      const escapedDot = sqlLiteral(`.${candidate}`);
+      const escapedLike = sqlLiteral(`%.${candidate}`);
+      clauses.push(`${column} = ${escaped}`);
+      clauses.push(`${column} = ${escapedDot}`);
+      clauses.push(`${column} LIKE ${escapedLike}`);
+    }
+  }
+  return clauses.length ? clauses.join(" OR ") : "1=0";
+}
+function sqlLiteral(value) {
+  const escaped = value.replaceAll("'", "''");
+  return `'${escaped}'`;
+}
+function expandHostCandidates(host) {
+  const parts = host.split(".").filter(Boolean);
+  if (parts.length <= 1)
+    return [host];
+  const candidates = /* @__PURE__ */ new Set();
+  candidates.add(host);
+  for (let i = 1; i <= parts.length - 2; i += 1) {
+    const candidate = parts.slice(i).join(".");
+    if (candidate)
+      candidates.add(candidate);
+  }
+  return Array.from(candidates);
+}
+function hostMatchesAny(hosts, cookieHost) {
+  const cookieDomain = cookieHost.startsWith(".") ? cookieHost.slice(1) : cookieHost;
+  return hosts.some((host) => hostMatchesCookieDomain(host, cookieDomain));
+}
+function dedupeCookies(cookies) {
+  const merged = /* @__PURE__ */ new Map();
+  for (const cookie of cookies) {
+    const key = `${cookie.name}|${cookie.domain ?? ""}|${cookie.path ?? ""}`;
+    if (!merged.has(key))
+      merged.set(key, cookie);
+  }
+  return Array.from(merged.values());
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromium/linuxPaths.js
+import { existsSync as existsSync3 } from "node:fs";
+import { homedir as homedir3 } from "node:os";
+import path3 from "node:path";
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromium/paths.js
+import { existsSync as existsSync2, statSync } from "node:fs";
+import { homedir as homedir2 } from "node:os";
+import path2 from "node:path";
+function looksLikePath(value) {
+  return value.includes("/") || value.includes("\\");
+}
+function expandPath(input) {
+  if (input.startsWith("~/"))
+    return path2.join(homedir2(), input.slice(2));
+  return path2.isAbsolute(input) ? input : path2.resolve(process.cwd(), input);
+}
+function safeStat(candidate) {
+  try {
+    return statSync(candidate);
+  } catch {
+    return null;
+  }
+}
+function resolveCookiesDbFromProfileOrRoots(options) {
+  const candidates = [];
+  if (options.profile && looksLikePath(options.profile)) {
+    const expanded = expandPath(options.profile);
+    const stat = safeStat(expanded);
+    if (stat?.isFile())
+      return expanded;
+    candidates.push(path2.join(expanded, "Cookies"));
+    candidates.push(path2.join(expanded, "Network", "Cookies"));
+  } else {
+    const profileDir = options.profile && options.profile.trim().length > 0 ? options.profile.trim() : "Default";
+    for (const root of options.roots) {
+      candidates.push(path2.join(root, profileDir, "Cookies"));
+      candidates.push(path2.join(root, profileDir, "Network", "Cookies"));
+    }
+  }
+  for (const candidate of candidates) {
+    if (existsSync2(candidate))
+      return candidate;
+  }
+  return null;
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromium/linuxPaths.js
+function resolveChromiumCookiesDbLinux(options) {
+  const home = homedir3();
+  const configHome = process.env["XDG_CONFIG_HOME"]?.trim() || path3.join(home, ".config");
+  const root = path3.join(configHome, options.configDirName);
+  if (options.profile && looksLikePath(options.profile)) {
+    const candidate = expandPath(options.profile);
+    if (candidate.endsWith("Cookies") && existsSync3(candidate))
+      return candidate;
+    const direct = path3.join(candidate, "Cookies");
+    if (existsSync3(direct))
+      return direct;
+    const network = path3.join(candidate, "Network", "Cookies");
+    if (existsSync3(network))
+      return network;
+    return null;
+  }
+  const profileDir = options.profile && options.profile.trim().length > 0 ? options.profile.trim() : "Default";
+  const candidates = [
+    path3.join(root, profileDir, "Cookies"),
+    path3.join(root, profileDir, "Network", "Cookies")
+  ];
+  for (const candidate of candidates) {
+    if (existsSync3(candidate))
+      return candidate;
+  }
+  return null;
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromeSqliteLinux.js
+async function getCookiesFromChromeSqliteLinux(options, origins, allowlistNames) {
+  const args = {
+    configDirName: "google-chrome"
+  };
+  if (options.profile !== void 0)
+    args.profile = options.profile;
+  const dbPath = resolveChromiumCookiesDbLinux(args);
+  if (!dbPath) {
+    return { cookies: [], warnings: ["Chrome cookies database not found."] };
+  }
+  const { password, warnings: keyringWarnings } = await getLinuxChromeSafeStoragePassword();
+  const v10Key = deriveAes128CbcKeyFromPassword("peanuts", { iterations: 1 });
+  const emptyKey = deriveAes128CbcKeyFromPassword("", { iterations: 1 });
+  const v11Key = deriveAes128CbcKeyFromPassword(password, { iterations: 1 });
+  const decrypt = (encryptedValue, opts) => {
+    const prefix = Buffer.from(encryptedValue).subarray(0, 3).toString("utf8");
+    if (prefix === "v10") {
+      return decryptChromiumAes128CbcCookieValue(encryptedValue, [v10Key, emptyKey], {
+        stripHashPrefix: opts.stripHashPrefix,
+        treatUnknownPrefixAsPlaintext: false
+      });
+    }
+    if (prefix === "v11") {
+      return decryptChromiumAes128CbcCookieValue(encryptedValue, [v11Key, emptyKey], {
+        stripHashPrefix: opts.stripHashPrefix,
+        treatUnknownPrefixAsPlaintext: false
+      });
+    }
+    return null;
+  };
+  const dbOptions = {
+    dbPath
+  };
+  if (options.profile)
+    dbOptions.profile = options.profile;
+  if (options.includeExpired !== void 0)
+    dbOptions.includeExpired = options.includeExpired;
+  if (options.debug !== void 0)
+    dbOptions.debug = options.debug;
+  const result = await getCookiesFromChromeSqliteDb(dbOptions, origins, allowlistNames, decrypt);
+  result.warnings.unshift(...keyringWarnings);
+  return result;
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromeSqliteMac.js
+import { homedir as homedir4 } from "node:os";
+import path4 from "node:path";
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromium/macosKeychain.js
+async function readKeychainGenericPassword(options) {
+  const res = await execCapture("security", ["find-generic-password", "-w", "-a", options.account, "-s", options.service], { timeoutMs: options.timeoutMs });
+  if (res.code === 0) {
+    const password = res.stdout.trim();
+    return { ok: true, password };
+  }
+  return {
+    ok: false,
+    error: `${res.stderr.trim() || `exit ${res.code}`}`
+  };
+}
+async function readKeychainGenericPasswordFirst(options) {
+  let lastError = null;
+  for (const service of options.services) {
+    const r = await readKeychainGenericPassword({
+      account: options.account,
+      service,
+      timeoutMs: options.timeoutMs
+    });
+    if (r.ok)
+      return r;
+    lastError = r.error;
+  }
+  return {
+    ok: false,
+    error: `Failed to read macOS Keychain (${options.label}): ${lastError ?? "permission denied / keychain locked / entry missing."}`
+  };
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromeSqliteMac.js
+function resolveKeychainForDb(dbPath) {
+  const lower = dbPath.toLowerCase();
+  if (lower.includes("bravesoftware") || lower.includes("brave-browser") || lower.includes("brave browser")) {
+    return {
+      account: "Brave",
+      services: ["Brave Safe Storage"],
+      label: "Brave Safe Storage"
+    };
+  }
+  return {
+    account: "Chrome",
+    services: ["Chrome Safe Storage"],
+    label: "Chrome Safe Storage"
+  };
+}
+async function getCookiesFromChromeSqliteMac(options, origins, allowlistNames) {
+  const dbPath = resolveChromeCookiesDb(options.profile);
+  if (!dbPath) {
+    return { cookies: [], warnings: ["Chrome cookies database not found."] };
+  }
+  const warnings = [];
+  const keychain = resolveKeychainForDb(dbPath);
+  const passwordResult = await readKeychainGenericPasswordFirst({
+    account: keychain.account,
+    services: keychain.services,
+    timeoutMs: options.timeoutMs ?? 3e3,
+    label: keychain.label
+  });
+  if (!passwordResult.ok) {
+    warnings.push(passwordResult.error);
+    return { cookies: [], warnings };
+  }
+  const chromePassword = passwordResult.password.trim();
+  if (!chromePassword) {
+    warnings.push(`macOS Keychain returned an empty ${keychain.label} password.`);
+    return { cookies: [], warnings };
+  }
+  const key = deriveAes128CbcKeyFromPassword(chromePassword, { iterations: 1003 });
+  const decrypt = (encryptedValue, opts) => decryptChromiumAes128CbcCookieValue(encryptedValue, [key], {
+    stripHashPrefix: opts.stripHashPrefix,
+    treatUnknownPrefixAsPlaintext: true
+  });
+  const dbOptions = {
+    dbPath
+  };
+  if (options.profile)
+    dbOptions.profile = options.profile;
+  if (options.includeExpired !== void 0)
+    dbOptions.includeExpired = options.includeExpired;
+  if (options.debug !== void 0)
+    dbOptions.debug = options.debug;
+  const result = await getCookiesFromChromeSqliteDb(dbOptions, origins, allowlistNames, decrypt);
+  result.warnings.unshift(...warnings);
+  return result;
+}
+function resolveChromeCookiesDb(profile) {
+  const home = homedir4();
+  const roots = process.platform === "darwin" ? [
+    path4.join(home, "Library", "Application Support", "Google", "Chrome"),
+    path4.join(home, "Library", "Application Support", "BraveSoftware", "Brave-Browser")
+  ] : [];
+  const args = { roots };
+  if (profile !== void 0)
+    args.profile = profile;
+  return resolveCookiesDbFromProfileOrRoots(args);
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromeSqliteWindows.js
+import path7 from "node:path";
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromium/windowsMasterKey.js
+import { existsSync as existsSync4, readFileSync } from "node:fs";
+import path5 from "node:path";
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromeSqlite/windowsDpapi.js
+async function dpapiUnprotect(data, options = {}) {
+  const timeoutMs = options.timeoutMs ?? 5e3;
+  const inputB64 = data.toString("base64");
+  const prelude = "try { Add-Type -AssemblyName System.Security.Cryptography.ProtectedData -ErrorAction Stop } catch { try { Add-Type -AssemblyName System.Security -ErrorAction Stop } catch {} };";
+  const script = prelude + `$in=[Convert]::FromBase64String('${inputB64}');$out=[System.Security.Cryptography.ProtectedData]::Unprotect($in,$null,[System.Security.Cryptography.DataProtectionScope]::CurrentUser);[Convert]::ToBase64String($out)`;
+  const res = await execCapture("powershell", ["-NoProfile", "-NonInteractive", "-Command", script], {
+    timeoutMs
+  });
+  if (res.code !== 0) {
+    return { ok: false, error: res.stderr.trim() || `powershell exit ${res.code}` };
+  }
+  try {
+    const out = Buffer.from(res.stdout.trim(), "base64");
+    return { ok: true, value: out };
+  } catch (error2) {
+    return { ok: false, error: error2 instanceof Error ? error2.message : String(error2) };
+  }
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromium/windowsMasterKey.js
+async function getWindowsChromiumMasterKey(userDataDir, label) {
+  const localStatePath = path5.join(userDataDir, "Local State");
+  if (!existsSync4(localStatePath)) {
+    return { ok: false, error: `${label} Local State file not found.` };
+  }
+  let encryptedKeyB64 = null;
+  try {
+    const raw = readFileSync(localStatePath, "utf8");
+    const parsed = JSON.parse(raw);
+    encryptedKeyB64 = typeof parsed.os_crypt?.encrypted_key === "string" ? parsed.os_crypt.encrypted_key : null;
+  } catch (error2) {
+    return {
+      ok: false,
+      error: `Failed to parse ${label} Local State: ${error2 instanceof Error ? error2.message : String(error2)}`
+    };
+  }
+  if (!encryptedKeyB64)
+    return { ok: false, error: `${label} Local State missing os_crypt.encrypted_key.` };
+  let encryptedKey;
+  try {
+    encryptedKey = Buffer.from(encryptedKeyB64, "base64");
+  } catch {
+    return { ok: false, error: `${label} Local State contains an invalid encrypted_key.` };
+  }
+  const prefix = Buffer.from("DPAPI", "utf8");
+  if (!encryptedKey.subarray(0, prefix.length).equals(prefix)) {
+    return { ok: false, error: `${label} encrypted_key does not start with DPAPI prefix.` };
+  }
+  const unprotected = await dpapiUnprotect(encryptedKey.subarray(prefix.length));
+  if (!unprotected.ok) {
+    return { ok: false, error: `DPAPI decrypt failed: ${unprotected.error}` };
+  }
+  return { ok: true, value: unprotected.value };
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromium/windowsPaths.js
+import { existsSync as existsSync5 } from "node:fs";
+import path6 from "node:path";
+function resolveChromiumPathsWindows(options) {
+  const localAppData = process.env["LOCALAPPDATA"];
+  const root = localAppData ? path6.join(localAppData, options.localAppDataVendorPath) : null;
+  if (options.profile && looksLikePath(options.profile)) {
+    const expanded = expandPath(options.profile);
+    const candidates2 = expanded.endsWith("Cookies") ? [expanded] : [
+      path6.join(expanded, "Network", "Cookies"),
+      path6.join(expanded, "Cookies"),
+      path6.join(expanded, "Default", "Network", "Cookies")
+    ];
+    for (const candidate of candidates2) {
+      if (!existsSync5(candidate))
+        continue;
+      const userDataDir = findUserDataDir(candidate);
+      return { dbPath: candidate, userDataDir };
+    }
+    if (existsSync5(path6.join(expanded, "Local State"))) {
+      return { dbPath: null, userDataDir: expanded };
+    }
+  }
+  const profileDir = options.profile && options.profile.trim().length > 0 ? options.profile.trim() : "Default";
+  if (!root)
+    return { dbPath: null, userDataDir: null };
+  const candidates = [
+    path6.join(root, profileDir, "Network", "Cookies"),
+    path6.join(root, profileDir, "Cookies")
+  ];
+  for (const candidate of candidates) {
+    if (existsSync5(candidate))
+      return { dbPath: candidate, userDataDir: root };
+  }
+  return { dbPath: null, userDataDir: root };
+}
+function findUserDataDir(cookiesDbPath) {
+  let current = path6.dirname(cookiesDbPath);
+  for (let i = 0; i < 6; i += 1) {
+    const localState = path6.join(current, "Local State");
+    if (existsSync5(localState))
+      return current;
+    const next = path6.dirname(current);
+    if (next === current)
+      break;
+    current = next;
+  }
+  return null;
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chromeSqliteWindows.js
+async function getCookiesFromChromeSqliteWindows(options, origins, allowlistNames) {
+  const resolveArgs = {
+    localAppDataVendorPath: path7.join("Google", "Chrome", "User Data")
+  };
+  if (options.profile !== void 0)
+    resolveArgs.profile = options.profile;
+  const { dbPath, userDataDir } = resolveChromiumPathsWindows(resolveArgs);
+  if (!dbPath || !userDataDir) {
+    return { cookies: [], warnings: ["Chrome cookies database not found."] };
+  }
+  const masterKey = await getWindowsChromiumMasterKey(userDataDir, "Chrome");
+  if (!masterKey.ok) {
+    return { cookies: [], warnings: [masterKey.error] };
+  }
+  const decrypt = (encryptedValue, opts) => {
+    return decryptChromiumAes256GcmCookieValue(encryptedValue, masterKey.value, {
+      stripHashPrefix: opts.stripHashPrefix
+    });
+  };
+  const dbOptions = {
+    dbPath
+  };
+  if (options.profile)
+    dbOptions.profile = options.profile;
+  if (options.includeExpired !== void 0)
+    dbOptions.includeExpired = options.includeExpired;
+  if (options.debug !== void 0)
+    dbOptions.debug = options.debug;
+  return await getCookiesFromChromeSqliteDb(dbOptions, origins, allowlistNames, decrypt);
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/chrome.js
+async function getCookiesFromChrome(options, origins, allowlistNames) {
+  const warnings = [];
+  if (process.platform === "darwin") {
+    const r = await getCookiesFromChromeSqliteMac(options, origins, allowlistNames);
+    warnings.push(...r.warnings);
+    const cookies = r.cookies;
+    return { cookies, warnings };
+  }
+  if (process.platform === "linux") {
+    const r = await getCookiesFromChromeSqliteLinux(options, origins, allowlistNames);
+    warnings.push(...r.warnings);
+    const cookies = r.cookies;
+    return { cookies, warnings };
+  }
+  if (process.platform === "win32") {
+    const r = await getCookiesFromChromeSqliteWindows(options, origins, allowlistNames);
+    warnings.push(...r.warnings);
+    const cookies = r.cookies;
+    return { cookies, warnings };
+  }
+  return { cookies: [], warnings };
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/edgeSqliteLinux.js
+async function getCookiesFromEdgeSqliteLinux(options, origins, allowlistNames) {
+  const args = {
+    configDirName: "microsoft-edge"
+  };
+  if (options.profile !== void 0)
+    args.profile = options.profile;
+  const dbPath = resolveChromiumCookiesDbLinux(args);
+  if (!dbPath) {
+    return { cookies: [], warnings: ["Edge cookies database not found."] };
+  }
+  const { password, warnings: keyringWarnings } = await getLinuxChromiumSafeStoragePassword({
+    app: "edge"
+  });
+  const v10Key = deriveAes128CbcKeyFromPassword("peanuts", { iterations: 1 });
+  const emptyKey = deriveAes128CbcKeyFromPassword("", { iterations: 1 });
+  const v11Key = deriveAes128CbcKeyFromPassword(password, { iterations: 1 });
+  const decrypt = (encryptedValue, opts) => {
+    const prefix = Buffer.from(encryptedValue).subarray(0, 3).toString("utf8");
+    if (prefix === "v10") {
+      return decryptChromiumAes128CbcCookieValue(encryptedValue, [v10Key, emptyKey], {
+        stripHashPrefix: opts.stripHashPrefix,
+        treatUnknownPrefixAsPlaintext: false
+      });
+    }
+    if (prefix === "v11") {
+      return decryptChromiumAes128CbcCookieValue(encryptedValue, [v11Key, emptyKey], {
+        stripHashPrefix: opts.stripHashPrefix,
+        treatUnknownPrefixAsPlaintext: false
+      });
+    }
+    return null;
+  };
+  const dbOptions = {
+    dbPath
+  };
+  if (options.profile)
+    dbOptions.profile = options.profile;
+  if (options.includeExpired !== void 0)
+    dbOptions.includeExpired = options.includeExpired;
+  if (options.debug !== void 0)
+    dbOptions.debug = options.debug;
+  const result = await getCookiesFromChromeSqliteDb(dbOptions, origins, allowlistNames, decrypt);
+  result.warnings.unshift(...keyringWarnings);
+  return result;
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/edgeSqliteMac.js
+import { homedir as homedir5 } from "node:os";
+import path8 from "node:path";
+async function getCookiesFromEdgeSqliteMac(options, origins, allowlistNames) {
+  const dbPath = resolveEdgeCookiesDb(options.profile);
+  if (!dbPath) {
+    return { cookies: [], warnings: ["Edge cookies database not found."] };
+  }
+  const warnings = [];
+  const passwordResult = await readKeychainGenericPasswordFirst({
+    account: "Microsoft Edge",
+    services: ["Microsoft Edge Safe Storage", "Microsoft Edge"],
+    timeoutMs: options.timeoutMs ?? 3e3,
+    label: "Microsoft Edge Safe Storage"
+  });
+  if (!passwordResult.ok) {
+    warnings.push(passwordResult.error);
+    return { cookies: [], warnings };
+  }
+  const edgePassword = passwordResult.password.trim();
+  if (!edgePassword) {
+    warnings.push("macOS Keychain returned an empty Microsoft Edge Safe Storage password.");
+    return { cookies: [], warnings };
+  }
+  const key = deriveAes128CbcKeyFromPassword(edgePassword, { iterations: 1003 });
+  const decrypt = (encryptedValue, opts) => decryptChromiumAes128CbcCookieValue(encryptedValue, [key], {
+    stripHashPrefix: opts.stripHashPrefix,
+    treatUnknownPrefixAsPlaintext: true
+  });
+  const dbOptions = {
+    dbPath
+  };
+  if (options.profile)
+    dbOptions.profile = options.profile;
+  if (options.includeExpired !== void 0)
+    dbOptions.includeExpired = options.includeExpired;
+  if (options.debug !== void 0)
+    dbOptions.debug = options.debug;
+  const result = await getCookiesFromChromeSqliteDb(dbOptions, origins, allowlistNames, decrypt);
+  result.warnings.unshift(...warnings);
+  return result;
+}
+function resolveEdgeCookiesDb(profile) {
+  const home = homedir5();
+  const roots = process.platform === "darwin" ? [path8.join(home, "Library", "Application Support", "Microsoft Edge")] : [];
+  const args = { roots };
+  if (profile !== void 0)
+    args.profile = profile;
+  return resolveCookiesDbFromProfileOrRoots(args);
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/edgeSqliteWindows.js
+import path9 from "node:path";
+async function getCookiesFromEdgeSqliteWindows(options, origins, allowlistNames) {
+  const resolveArgs = {
+    localAppDataVendorPath: path9.join("Microsoft", "Edge", "User Data")
+  };
+  if (options.profile !== void 0)
+    resolveArgs.profile = options.profile;
+  const { dbPath, userDataDir } = resolveChromiumPathsWindows(resolveArgs);
+  if (!dbPath || !userDataDir) {
+    return { cookies: [], warnings: ["Edge cookies database not found."] };
+  }
+  const masterKey = await getWindowsChromiumMasterKey(userDataDir, "Edge");
+  if (!masterKey.ok) {
+    return { cookies: [], warnings: [masterKey.error] };
+  }
+  const decrypt = (encryptedValue, opts) => {
+    return decryptChromiumAes256GcmCookieValue(encryptedValue, masterKey.value, {
+      stripHashPrefix: opts.stripHashPrefix
+    });
+  };
+  const dbOptions = {
+    dbPath
+  };
+  if (options.profile)
+    dbOptions.profile = options.profile;
+  if (options.includeExpired !== void 0)
+    dbOptions.includeExpired = options.includeExpired;
+  if (options.debug !== void 0)
+    dbOptions.debug = options.debug;
+  return await getCookiesFromChromeSqliteDb(dbOptions, origins, allowlistNames, decrypt);
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/edge.js
+async function getCookiesFromEdge(options, origins, allowlistNames) {
+  const warnings = [];
+  if (process.platform === "darwin") {
+    const r = await getCookiesFromEdgeSqliteMac(options, origins, allowlistNames);
+    warnings.push(...r.warnings);
+    const cookies = r.cookies;
+    return { cookies, warnings };
+  }
+  if (process.platform === "linux") {
+    const r = await getCookiesFromEdgeSqliteLinux(options, origins, allowlistNames);
+    warnings.push(...r.warnings);
+    const cookies = r.cookies;
+    return { cookies, warnings };
+  }
+  if (process.platform === "win32") {
+    const r = await getCookiesFromEdgeSqliteWindows(options, origins, allowlistNames);
+    warnings.push(...r.warnings);
+    const cookies = r.cookies;
+    return { cookies, warnings };
+  }
+  return { cookies: [], warnings };
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/firefoxSqlite.js
+import { copyFileSync as copyFileSync2, existsSync as existsSync6, mkdtempSync as mkdtempSync2, readdirSync, rmSync as rmSync2 } from "node:fs";
+import { homedir as homedir6, tmpdir as tmpdir2 } from "node:os";
+import path10 from "node:path";
+async function getCookiesFromFirefox(options, origins, allowlistNames) {
+  const warnings = [];
+  const dbPath = resolveFirefoxCookiesDb(options.profile);
+  if (!dbPath) {
+    warnings.push("Firefox cookies database not found.");
+    return { cookies: [], warnings };
+  }
+  const tempDir = mkdtempSync2(path10.join(tmpdir2(), "sweet-cookie-firefox-"));
+  const tempDbPath = path10.join(tempDir, "cookies.sqlite");
+  try {
+    copyFileSync2(dbPath, tempDbPath);
+    copySidecar2(dbPath, `${tempDbPath}-wal`, "-wal");
+    copySidecar2(dbPath, `${tempDbPath}-shm`, "-shm");
+  } catch (error2) {
+    rmSync2(tempDir, { recursive: true, force: true });
+    warnings.push(`Failed to copy Firefox cookie DB: ${error2 instanceof Error ? error2.message : String(error2)}`);
+    return { cookies: [], warnings };
+  }
+  const hosts = origins.map((o) => new URL(o).hostname);
+  const now = Math.floor(Date.now() / 1e3);
+  const where = buildHostWhereClause2(hosts);
+  const expiryClause = options.includeExpired ? "" : ` AND (expiry = 0 OR expiry > ${now})`;
+  const sql = `SELECT name, value, host, path, expiry, isSecure, isHttpOnly, sameSite FROM moz_cookies WHERE (${where})${expiryClause} ORDER BY expiry DESC;`;
+  try {
+    if (isBunRuntime()) {
+      const bunResult = await queryFirefoxCookiesWithBunSqlite(tempDbPath, sql);
+      if (!bunResult.ok) {
+        warnings.push(`bun:sqlite failed reading Firefox cookies: ${bunResult.error}`);
+        return { cookies: [], warnings };
+      }
+      const cookies2 = collectFirefoxCookiesFromRows(bunResult.rows, options, hosts, allowlistNames);
+      return { cookies: dedupeCookies2(cookies2), warnings };
+    }
+    const nodeResult = await queryFirefoxCookiesWithNodeSqlite(tempDbPath, sql);
+    if (!nodeResult.ok) {
+      warnings.push(`node:sqlite failed reading Firefox cookies: ${nodeResult.error}`);
+      return { cookies: [], warnings };
+    }
+    const cookies = collectFirefoxCookiesFromRows(nodeResult.rows, options, hosts, allowlistNames);
+    return { cookies: dedupeCookies2(cookies), warnings };
+  } finally {
+    rmSync2(tempDir, { recursive: true, force: true });
+  }
+}
+async function queryFirefoxCookiesWithNodeSqlite(dbPath, sql) {
+  try {
+    const { DatabaseSync } = await importNodeSqlite();
+    const db = new DatabaseSync(dbPath, { readOnly: true });
+    try {
+      const rows = db.prepare(sql).all();
+      return { ok: true, rows };
+    } finally {
+      db.close();
+    }
+  } catch (error2) {
+    return { ok: false, error: error2 instanceof Error ? error2.message : String(error2) };
+  }
+}
+async function queryFirefoxCookiesWithBunSqlite(dbPath, sql) {
+  try {
+    const { Database } = await import("bun:sqlite");
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const rows = db.query(sql).all();
+      return { ok: true, rows };
+    } finally {
+      db.close();
+    }
+  } catch (error2) {
+    return { ok: false, error: error2 instanceof Error ? error2.message : String(error2) };
+  }
+}
+function collectFirefoxCookiesFromRows(rows, options, hosts, allowlistNames) {
+  const now = Math.floor(Date.now() / 1e3);
+  const cookies = [];
+  for (const row of rows) {
+    const name = typeof row.name === "string" ? row.name : null;
+    const value = typeof row.value === "string" ? row.value : null;
+    const host = typeof row.host === "string" ? row.host : null;
+    const cookiePath = typeof row.path === "string" ? row.path : "";
+    if (!name || value === null || !host)
+      continue;
+    if (allowlistNames && allowlistNames.size > 0 && !allowlistNames.has(name))
+      continue;
+    if (!hostMatchesAny2(hosts, host))
+      continue;
+    const expiryText = typeof row.expiry === "number" ? String(row.expiry) : typeof row.expiry === "string" ? row.expiry : void 0;
+    const expires = normalizeFirefoxExpiry(expiryText);
+    if (!options.includeExpired && expires && expires < now)
+      continue;
+    const isSecure = row.isSecure === 1 || row.isSecure === "1" || row.isSecure === true;
+    const isHttpOnly = row.isHttpOnly === 1 || row.isHttpOnly === "1" || row.isHttpOnly === true;
+    const cookie = {
+      name,
+      value,
+      domain: host.startsWith(".") ? host.slice(1) : host,
+      path: cookiePath || "/",
+      secure: isSecure,
+      httpOnly: isHttpOnly
+    };
+    if (expires !== void 0)
+      cookie.expires = expires;
+    const normalizedSameSite = normalizeFirefoxSameSite(typeof row.sameSite === "number" ? String(row.sameSite) : typeof row.sameSite === "string" ? row.sameSite : void 0);
+    if (normalizedSameSite !== void 0)
+      cookie.sameSite = normalizedSameSite;
+    const source = { browser: "firefox" };
+    if (options.profile)
+      source.profile = options.profile;
+    cookie.source = source;
+    cookies.push(cookie);
+  }
+  return cookies;
+}
+function resolveFirefoxCookiesDb(profile) {
+  const home = homedir6();
+  const appData = process.env["APPDATA"];
+  const roots = process.platform === "darwin" ? [path10.join(home, "Library", "Application Support", "Firefox", "Profiles")] : process.platform === "linux" ? [path10.join(home, ".mozilla", "firefox")] : process.platform === "win32" ? appData ? [path10.join(appData, "Mozilla", "Firefox", "Profiles")] : [] : [];
+  if (profile && looksLikePath2(profile)) {
+    const candidate = profile.endsWith("cookies.sqlite") ? profile : path10.join(profile, "cookies.sqlite");
+    return existsSync6(candidate) ? candidate : null;
+  }
+  for (const root of roots) {
+    if (!root || !existsSync6(root))
+      continue;
+    if (profile) {
+      const candidate2 = path10.join(root, profile, "cookies.sqlite");
+      if (existsSync6(candidate2))
+        return candidate2;
+      continue;
+    }
+    const entries = safeReaddir(root);
+    const defaultRelease = entries.find((e) => e.includes("default-release"));
+    const picked = defaultRelease ?? entries[0];
+    if (!picked)
+      continue;
+    const candidate = path10.join(root, picked, "cookies.sqlite");
+    if (existsSync6(candidate))
+      return candidate;
+  }
+  return null;
+}
+function safeReaddir(dir) {
+  try {
+    return readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+  } catch {
+    return [];
+  }
+}
+function looksLikePath2(value) {
+  return value.includes("/") || value.includes("\\");
+}
+function copySidecar2(sourceDbPath, target, suffix) {
+  const sidecar = `${sourceDbPath}${suffix}`;
+  if (!existsSync6(sidecar))
+    return;
+  try {
+    copyFileSync2(sidecar, target);
+  } catch {
+  }
+}
+function buildHostWhereClause2(hosts) {
+  const clauses = [];
+  for (const host of hosts) {
+    const escaped = sqlLiteral2(host);
+    const escapedDot = sqlLiteral2(`.${host}`);
+    const escapedLike = sqlLiteral2(`%.${host}`);
+    clauses.push(`host = ${escaped}`);
+    clauses.push(`host = ${escapedDot}`);
+    clauses.push(`host LIKE ${escapedLike}`);
+  }
+  return clauses.length ? clauses.join(" OR ") : "1=0";
+}
+function sqlLiteral2(value) {
+  const escaped = value.replaceAll("'", "''");
+  return `'${escaped}'`;
+}
+function normalizeFirefoxExpiry(expiry) {
+  if (!expiry)
+    return void 0;
+  const value = Number.parseInt(expiry, 10);
+  if (!Number.isFinite(value) || value <= 0)
+    return void 0;
+  return value;
+}
+function normalizeFirefoxSameSite(raw) {
+  if (!raw)
+    return void 0;
+  const value = Number.parseInt(raw, 10);
+  if (Number.isFinite(value)) {
+    if (value === 2)
+      return "Strict";
+    if (value === 1)
+      return "Lax";
+    if (value === 0)
+      return "None";
+  }
+  const normalized = raw.toLowerCase();
+  if (normalized === "strict")
+    return "Strict";
+  if (normalized === "lax")
+    return "Lax";
+  if (normalized === "none")
+    return "None";
+  return void 0;
+}
+function hostMatchesAny2(hosts, cookieHost) {
+  const cookieDomain = cookieHost.startsWith(".") ? cookieHost.slice(1) : cookieHost;
+  return hosts.some((host) => hostMatchesCookieDomain(host, cookieDomain));
+}
+function dedupeCookies2(cookies) {
+  const merged = /* @__PURE__ */ new Map();
+  for (const cookie of cookies) {
+    const key = `${cookie.name}|${cookie.domain ?? ""}|${cookie.path ?? ""}`;
+    if (!merged.has(key))
+      merged.set(key, cookie);
+  }
+  return Array.from(merged.values());
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/util/base64.js
+function tryDecodeBase64Json(input) {
+  const trimmed = input.trim();
+  if (!trimmed)
+    return null;
+  try {
+    const encoding = /[-_]/.test(trimmed) ? "base64url" : "base64";
+    const buf = Buffer.from(trimmed, encoding);
+    const decoded = buf.toString("utf8").trim();
+    if (!decoded)
+      return null;
+    JSON.parse(decoded);
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/util/fs.js
+import fs from "node:fs/promises";
+async function readTextFileIfExists(filePath) {
+  try {
+    const stat = await fs.stat(filePath);
+    if (!stat.isFile())
+      return null;
+    return await fs.readFile(filePath, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/inline.js
+async function getCookiesFromInline(inline, origins, allowlistNames) {
+  const warnings = [];
+  const rawPayload = inline.source.endsWith("file") || inline.payload.endsWith(".json") || inline.payload.endsWith(".base64") ? await readTextFileIfExists(inline.payload) ?? inline.payload : inline.payload;
+  const decoded = tryDecodeBase64Json(rawPayload) ?? rawPayload;
+  const parsed = tryParseCookiePayload(decoded);
+  if (!parsed) {
+    return { cookies: [], warnings };
+  }
+  const hostAllow = new Set(origins.map((o) => new URL(o).hostname));
+  const cookies = [];
+  for (const cookie of parsed.cookies) {
+    if (!cookie?.name)
+      continue;
+    if (allowlistNames && allowlistNames.size > 0 && !allowlistNames.has(cookie.name))
+      continue;
+    const domain2 = cookie.domain ?? (cookie.url ? safeHostnameFromUrl(cookie.url) : void 0);
+    if (domain2 && hostAllow.size > 0 && !matchesAnyHost(hostAllow, domain2))
+      continue;
+    cookies.push(cookie);
+  }
+  return { cookies, warnings };
+}
+function tryParseCookiePayload(input) {
+  const trimmed = input.trim();
+  if (!trimmed)
+    return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      return { cookies: parsed };
+    }
+    if (parsed && typeof parsed === "object" && Array.isArray(parsed.cookies)) {
+      return { cookies: parsed.cookies };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+function matchesAnyHost(hosts, cookieDomain) {
+  for (const host of hosts) {
+    if (hostMatchesCookieDomain(host, cookieDomain))
+      return true;
+  }
+  return false;
+}
+function safeHostnameFromUrl(url2) {
+  try {
+    return new URL(url2).hostname;
+  } catch {
+    return void 0;
+  }
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/providers/safariBinaryCookies.js
+import { existsSync as existsSync7, readFileSync as readFileSync2 } from "node:fs";
+import { homedir as homedir7 } from "node:os";
+import path11 from "node:path";
+var MAC_EPOCH_DELTA_SECONDS = 978307200;
+async function getCookiesFromSafari(options, origins, allowlistNames) {
+  const warnings = [];
+  if (process.platform !== "darwin") {
+    return { cookies: [], warnings };
+  }
+  const cookieFile = options.file ?? resolveSafariBinaryCookiesPath();
+  if (!cookieFile) {
+    warnings.push("Safari Cookies.binarycookies not found.");
+    return { cookies: [], warnings };
+  }
+  const hosts = origins.map((o) => new URL(o).hostname);
+  const now = Math.floor(Date.now() / 1e3);
+  try {
+    const data = readFileSync2(cookieFile);
+    const parsed = decodeBinaryCookies(data);
+    const cookies = [];
+    for (const cookie of parsed) {
+      if (!cookie.name)
+        continue;
+      if (allowlistNames && allowlistNames.size > 0 && !allowlistNames.has(cookie.name))
+        continue;
+      const domain2 = cookie.domain;
+      if (!domain2)
+        continue;
+      if (!hosts.some((h) => hostMatchesCookieDomain(h, domain2)))
+        continue;
+      if (!options.includeExpired && cookie.expires && cookie.expires < now)
+        continue;
+      cookies.push(cookie);
+    }
+    return { cookies: dedupeCookies3(cookies), warnings };
+  } catch (error2) {
+    warnings.push(`Failed to read Safari cookies: ${error2 instanceof Error ? error2.message : String(error2)}`);
+    return { cookies: [], warnings };
+  }
+}
+function resolveSafariBinaryCookiesPath() {
+  const home = homedir7();
+  const candidates = [
+    path11.join(home, "Library", "Cookies", "Cookies.binarycookies"),
+    path11.join(home, "Library", "Containers", "com.apple.Safari", "Data", "Library", "Cookies", "Cookies.binarycookies")
+  ];
+  for (const candidate of candidates) {
+    if (existsSync7(candidate))
+      return candidate;
+  }
+  return null;
+}
+function decodeBinaryCookies(buffer) {
+  if (buffer.length < 8)
+    return [];
+  if (buffer.subarray(0, 4).toString("utf8") !== "cook")
+    return [];
+  const pageCount = buffer.readUInt32BE(4);
+  let cursor = 8;
+  const pageSizes = [];
+  for (let i = 0; i < pageCount; i += 1) {
+    pageSizes.push(buffer.readUInt32BE(cursor));
+    cursor += 4;
+  }
+  const cookies = [];
+  for (const pageSize of pageSizes) {
+    const page = buffer.subarray(cursor, cursor + pageSize);
+    cursor += pageSize;
+    cookies.push(...decodePage(page));
+  }
+  return cookies;
+}
+function decodePage(page) {
+  if (page.length < 16)
+    return [];
+  const header = page.readUInt32BE(0);
+  if (header !== 256)
+    return [];
+  const cookieCount = page.readUInt32LE(4);
+  const offsets = [];
+  let cursor = 8;
+  for (let i = 0; i < cookieCount; i += 1) {
+    offsets.push(page.readUInt32LE(cursor));
+    cursor += 4;
+  }
+  const cookies = [];
+  for (const offset of offsets) {
+    const cookie = decodeCookie(page.subarray(offset));
+    if (cookie)
+      cookies.push(cookie);
+  }
+  return cookies;
+}
+function decodeCookie(cookieBuffer) {
+  if (cookieBuffer.length < 48)
+    return null;
+  const size = cookieBuffer.readUInt32LE(0);
+  if (size < 48 || size > cookieBuffer.length)
+    return null;
+  const flagsValue = cookieBuffer.readUInt32LE(8);
+  const isSecure = (flagsValue & 1) !== 0;
+  const isHttpOnly = (flagsValue & 4) !== 0;
+  const urlOffset = cookieBuffer.readUInt32LE(16);
+  const nameOffset = cookieBuffer.readUInt32LE(20);
+  const pathOffset = cookieBuffer.readUInt32LE(24);
+  const valueOffset = cookieBuffer.readUInt32LE(28);
+  const expiration = readDoubleLE(cookieBuffer, 40);
+  const rawUrl = readCString(cookieBuffer, urlOffset, size);
+  const name = readCString(cookieBuffer, nameOffset, size);
+  const cookiePath = readCString(cookieBuffer, pathOffset, size) ?? "/";
+  const value = readCString(cookieBuffer, valueOffset, size) ?? "";
+  if (!name)
+    return null;
+  const domain2 = rawUrl ? safeHostnameFromUrl2(rawUrl) : void 0;
+  const expires = expiration && expiration > 0 ? Math.round(expiration + MAC_EPOCH_DELTA_SECONDS) : void 0;
+  const decoded = {
+    name,
+    value,
+    path: cookiePath,
+    secure: isSecure,
+    httpOnly: isHttpOnly,
+    source: { browser: "safari" }
+  };
+  if (domain2)
+    decoded.domain = domain2;
+  if (expires !== void 0)
+    decoded.expires = expires;
+  return decoded;
+}
+function readDoubleLE(buffer, offset) {
+  if (offset + 8 > buffer.length)
+    return 0;
+  const slice = buffer.subarray(offset, offset + 8);
+  return slice.readDoubleLE(0);
+}
+function readCString(buffer, offset, end) {
+  if (offset <= 0 || offset >= end)
+    return null;
+  let cursor = offset;
+  while (cursor < end && buffer[cursor] !== 0)
+    cursor += 1;
+  if (cursor >= end)
+    return null;
+  return buffer.toString("utf8", offset, cursor);
+}
+function safeHostnameFromUrl2(raw) {
+  try {
+    const url2 = raw.includes("://") ? raw : `https://${raw}`;
+    const parsed = new URL(url2);
+    return parsed.hostname.startsWith(".") ? parsed.hostname.slice(1) : parsed.hostname;
+  } catch {
+    const cleaned = raw.trim();
+    if (!cleaned)
+      return void 0;
+    return cleaned.startsWith(".") ? cleaned.slice(1) : cleaned;
+  }
+}
+function dedupeCookies3(cookies) {
+  const merged = /* @__PURE__ */ new Map();
+  for (const cookie of cookies) {
+    const key = `${cookie.name}|${cookie.domain ?? ""}|${cookie.path ?? ""}`;
+    if (!merged.has(key))
+      merged.set(key, cookie);
+  }
+  return Array.from(merged.values());
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/util/origins.js
+function normalizeOrigins(url2, extraOrigins) {
+  const origins = [];
+  try {
+    const parsed = new URL(url2);
+    origins.push(ensureTrailingSlash(parsed.origin));
+  } catch {
+  }
+  for (const raw of extraOrigins ?? []) {
+    const trimmed = raw.trim();
+    if (!trimmed)
+      continue;
+    try {
+      const parsed = new URL(trimmed);
+      origins.push(ensureTrailingSlash(parsed.origin));
+    } catch {
+    }
+  }
+  return Array.from(new Set(origins));
+}
+function ensureTrailingSlash(origin) {
+  return origin.endsWith("/") ? origin : `${origin}/`;
+}
+
+// node_modules/.pnpm/@connormartin+sweet-cookie@0.1.0/node_modules/@connormartin/sweet-cookie/dist/public.js
+var DEFAULT_BROWSERS = ["chrome", "safari", "firefox"];
+async function getCookies(options) {
+  const warnings = [];
+  const url2 = options.url;
+  const origins = normalizeOrigins(url2, options.origins);
+  const names = normalizeNames(options.names);
+  let browsers;
+  if (Array.isArray(options.browsers) && options.browsers.length > 0) {
+    browsers = options.browsers;
+  } else {
+    browsers = parseBrowsersEnv() ?? DEFAULT_BROWSERS;
+  }
+  const mode = options.mode ?? parseModeEnv() ?? "merge";
+  const inlineSources = await resolveInlineSources(options);
+  for (const source of inlineSources) {
+    const inlineResult = await getCookiesFromInline(source, origins, names);
+    warnings.push(...inlineResult.warnings);
+    if (inlineResult.cookies.length) {
+      return { cookies: inlineResult.cookies, warnings };
+    }
+  }
+  const merged = /* @__PURE__ */ new Map();
+  const tryAdd = (cookie) => {
+    const domain2 = cookie.domain ?? "";
+    const pathValue = cookie.path ?? "";
+    const key = `${cookie.name}|${domain2}|${pathValue}`;
+    if (!merged.has(key)) {
+      merged.set(key, cookie);
+    }
+  };
+  for (const browser of browsers) {
+    let result;
+    if (browser === "chrome") {
+      const chromeOptions = {};
+      const chromeProfile = options.chromeProfile ?? options.profile ?? readEnv2("SWEET_COOKIE_CHROME_PROFILE");
+      if (chromeProfile)
+        chromeOptions.profile = chromeProfile;
+      if (options.timeoutMs !== void 0)
+        chromeOptions.timeoutMs = options.timeoutMs;
+      if (options.includeExpired !== void 0)
+        chromeOptions.includeExpired = options.includeExpired;
+      if (options.debug !== void 0)
+        chromeOptions.debug = options.debug;
+      result = await getCookiesFromChrome(chromeOptions, origins, names);
+    } else if (browser === "edge") {
+      const edgeOptions = {};
+      const edgeProfile = options.edgeProfile ?? options.profile ?? readEnv2("SWEET_COOKIE_EDGE_PROFILE") ?? readEnv2("SWEET_COOKIE_CHROME_PROFILE");
+      if (edgeProfile)
+        edgeOptions.profile = edgeProfile;
+      if (options.timeoutMs !== void 0)
+        edgeOptions.timeoutMs = options.timeoutMs;
+      if (options.includeExpired !== void 0)
+        edgeOptions.includeExpired = options.includeExpired;
+      if (options.debug !== void 0)
+        edgeOptions.debug = options.debug;
+      result = await getCookiesFromEdge(edgeOptions, origins, names);
+    } else if (browser === "firefox") {
+      const firefoxOptions = {};
+      const firefoxProfile = options.firefoxProfile ?? readEnv2("SWEET_COOKIE_FIREFOX_PROFILE");
+      if (firefoxProfile)
+        firefoxOptions.profile = firefoxProfile;
+      if (options.includeExpired !== void 0)
+        firefoxOptions.includeExpired = options.includeExpired;
+      result = await getCookiesFromFirefox(firefoxOptions, origins, names);
+    } else {
+      const safariOptions = {};
+      if (options.includeExpired !== void 0)
+        safariOptions.includeExpired = options.includeExpired;
+      if (options.safariCookiesFile)
+        safariOptions.file = options.safariCookiesFile;
+      result = await getCookiesFromSafari(safariOptions, origins, names);
+    }
+    warnings.push(...result.warnings);
+    if (mode === "first" && result.cookies.length) {
+      return { cookies: result.cookies, warnings };
+    }
+    for (const cookie of result.cookies) {
+      tryAdd(cookie);
+    }
+  }
+  return { cookies: Array.from(merged.values()), warnings };
+}
+function normalizeNames(names) {
+  if (!names?.length)
+    return null;
+  const cleaned = names.map((n) => n.trim()).filter(Boolean);
+  if (!cleaned.length)
+    return null;
+  return new Set(cleaned);
+}
+async function resolveInlineSources(options) {
+  const sources = [];
+  if (options.inlineCookiesJson) {
+    sources.push({ source: "inline-json", payload: options.inlineCookiesJson });
+  }
+  if (options.inlineCookiesBase64) {
+    sources.push({ source: "inline-base64", payload: options.inlineCookiesBase64 });
+  }
+  if (options.inlineCookiesFile) {
+    sources.push({ source: "inline-file", payload: options.inlineCookiesFile });
+  }
+  return sources;
+}
+function parseBrowsersEnv() {
+  const raw = readEnv2("SWEET_COOKIE_BROWSERS") ?? readEnv2("SWEET_COOKIE_SOURCES");
+  if (!raw)
+    return void 0;
+  const tokens = raw.split(/[,\s]+/).map((t) => t.trim().toLowerCase()).filter(Boolean);
+  const out = [];
+  for (const token of tokens) {
+    if (token === "chrome" || token === "edge" || token === "firefox" || token === "safari") {
+      if (!out.includes(token))
+        out.push(token);
+    }
+  }
+  return out.length ? out : void 0;
+}
+function parseModeEnv() {
+  const raw = readEnv2("SWEET_COOKIE_MODE");
+  if (!raw)
+    return void 0;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "merge" || normalized === "first")
+    return normalized;
+  return void 0;
+}
+function readEnv2(key) {
+  const value = process.env[key];
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed.length ? trimmed : void 0;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/cookies.js
+var TWITTER_COOKIE_NAMES = ["auth_token", "ct0"];
+var TWITTER_URL = "https://x.com/";
+var TWITTER_ORIGINS = ["https://x.com/", "https://twitter.com/"];
+var DEFAULT_COOKIE_TIMEOUT_MS = 3e4;
+function normalizeValue(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+function cookieHeader(authToken, ct0) {
+  return `auth_token=${authToken}; ct0=${ct0}`;
+}
+function buildEmpty() {
+  return { authToken: null, ct0: null, cookieHeader: null, source: null };
+}
+function readEnvCookie(cookies, keys, field) {
+  if (cookies[field]) {
+    return;
+  }
+  for (const key of keys) {
+    const value = normalizeValue(process.env[key]);
+    if (!value) {
+      continue;
+    }
+    cookies[field] = value;
+    if (!cookies.source) {
+      cookies.source = `env ${key}`;
+    }
+    break;
+  }
+}
+function resolveSources(cookieSource) {
+  if (Array.isArray(cookieSource)) {
+    return cookieSource;
+  }
+  if (cookieSource) {
+    return [cookieSource];
+  }
+  return ["safari", "chrome", "firefox"];
+}
+function labelForSource(source, profile) {
+  if (source === "safari") {
+    return "Safari";
+  }
+  if (source === "chrome") {
+    return profile ? `Chrome profile "${profile}"` : "Chrome default profile";
+  }
+  return profile ? `Firefox profile "${profile}"` : "Firefox default profile";
+}
+function pickCookieValue(cookies, name) {
+  const matches = cookies.filter((c) => c?.name === name && typeof c.value === "string");
+  if (matches.length === 0) {
+    return null;
+  }
+  const preferred = matches.find((c) => (c.domain ?? "").endsWith("x.com"));
+  if (preferred?.value) {
+    return preferred.value;
+  }
+  const twitter = matches.find((c) => (c.domain ?? "").endsWith("twitter.com"));
+  if (twitter?.value) {
+    return twitter.value;
+  }
+  return matches[0]?.value ?? null;
+}
+async function readTwitterCookiesFromBrowser(options) {
+  const warnings = [];
+  const out = buildEmpty();
+  const { cookies, warnings: providerWarnings } = await getCookies({
+    url: TWITTER_URL,
+    origins: TWITTER_ORIGINS,
+    names: [...TWITTER_COOKIE_NAMES],
+    browsers: [options.source],
+    mode: "merge",
+    chromeProfile: options.chromeProfile,
+    firefoxProfile: options.firefoxProfile,
+    timeoutMs: options.cookieTimeoutMs
+  });
+  warnings.push(...providerWarnings);
+  const authToken = pickCookieValue(cookies, "auth_token");
+  const ct0 = pickCookieValue(cookies, "ct0");
+  if (authToken) {
+    out.authToken = authToken;
+  }
+  if (ct0) {
+    out.ct0 = ct0;
+  }
+  if (out.authToken && out.ct0) {
+    out.cookieHeader = cookieHeader(out.authToken, out.ct0);
+    out.source = labelForSource(options.source, options.source === "chrome" ? options.chromeProfile : options.firefoxProfile);
+    return { cookies: out, warnings };
+  }
+  if (options.source === "safari") {
+    warnings.push("No Twitter cookies found in Safari. Make sure you are logged into x.com in Safari.");
+  } else if (options.source === "chrome") {
+    warnings.push("No Twitter cookies found in Chrome. Make sure you are logged into x.com in Chrome.");
+  } else {
+    warnings.push("No Twitter cookies found in Firefox. Make sure you are logged into x.com in Firefox and the profile exists.");
+  }
+  return { cookies: out, warnings };
+}
+async function resolveCredentials(options) {
+  const warnings = [];
+  const cookies = buildEmpty();
+  const cookieTimeoutMs = typeof options.cookieTimeoutMs === "number" && Number.isFinite(options.cookieTimeoutMs) && options.cookieTimeoutMs > 0 ? options.cookieTimeoutMs : process.platform === "darwin" ? DEFAULT_COOKIE_TIMEOUT_MS : void 0;
+  if (options.authToken) {
+    cookies.authToken = options.authToken;
+    cookies.source = "CLI argument";
+  }
+  if (options.ct0) {
+    cookies.ct0 = options.ct0;
+    if (!cookies.source) {
+      cookies.source = "CLI argument";
+    }
+  }
+  readEnvCookie(cookies, ["AUTH_TOKEN", "TWITTER_AUTH_TOKEN"], "authToken");
+  readEnvCookie(cookies, ["CT0", "TWITTER_CT0"], "ct0");
+  if (cookies.authToken && cookies.ct0) {
+    cookies.cookieHeader = cookieHeader(cookies.authToken, cookies.ct0);
+    return { cookies, warnings };
+  }
+  const sourcesToTry = resolveSources(options.cookieSource);
+  for (const source of sourcesToTry) {
+    const res = await readTwitterCookiesFromBrowser({
+      source,
+      chromeProfile: options.chromeProfile,
+      firefoxProfile: options.firefoxProfile,
+      cookieTimeoutMs
+    });
+    warnings.push(...res.warnings);
+    if (res.cookies.authToken && res.cookies.ct0) {
+      return { cookies: res.cookies, warnings };
+    }
+  }
+  if (!cookies.authToken) {
+    warnings.push("Missing auth_token - provide via --auth-token, AUTH_TOKEN env var, or login to x.com in Safari/Chrome/Firefox");
+  }
+  if (!cookies.ct0) {
+    warnings.push("Missing ct0 - provide via --ct0, CT0 env var, or login to x.com in Safari/Chrome/Firefox");
+  }
+  if (cookies.authToken && cookies.ct0) {
+    cookies.cookieHeader = cookieHeader(cookies.authToken, cookies.ct0);
+  }
+  return { cookies, warnings };
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/runtime-query-ids.js
+import { mkdir as mkdir2, readFile as readFile2, writeFile as writeFile2 } from "node:fs/promises";
+import { homedir as homedir8 } from "node:os";
+import path12 from "node:path";
+var DEFAULT_CACHE_FILENAME = "query-ids-cache.json";
+var DEFAULT_TTL_MS = 24 * 60 * 60 * 1e3;
+var DISCOVERY_PAGES = [
+  "https://x.com/?lang=en",
+  "https://x.com/explore",
+  "https://x.com/notifications",
+  "https://x.com/settings/profile"
+];
+var BUNDLE_URL_REGEX = /https:\/\/abs\.twimg\.com\/responsive-web\/client-web(?:-legacy)?\/[A-Za-z0-9.-]+\.js/g;
+var QUERY_ID_REGEX = /^[a-zA-Z0-9_-]+$/;
+var OPERATION_PATTERNS = [
+  {
+    regex: /e\.exports=\{queryId\s*:\s*["']([^"']+)["']\s*,\s*operationName\s*:\s*["']([^"']+)["']/gs,
+    operationGroup: 2,
+    queryIdGroup: 1
+  },
+  {
+    regex: /e\.exports=\{operationName\s*:\s*["']([^"']+)["']\s*,\s*queryId\s*:\s*["']([^"']+)["']/gs,
+    operationGroup: 1,
+    queryIdGroup: 2
+  },
+  {
+    regex: /operationName\s*[:=]\s*["']([^"']+)["'](.{0,4000}?)queryId\s*[:=]\s*["']([^"']+)["']/gs,
+    operationGroup: 1,
+    queryIdGroup: 3
+  },
+  {
+    regex: /queryId\s*[:=]\s*["']([^"']+)["'](.{0,4000}?)operationName\s*[:=]\s*["']([^"']+)["']/gs,
+    operationGroup: 3,
+    queryIdGroup: 1
+  }
+];
+var HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+  Accept: "text/html,application/json;q=0.9,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9"
+};
+async function fetchText(fetchImpl, url2) {
+  const response = await fetchImpl(url2, { headers: HEADERS });
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`HTTP ${response.status} for ${url2}: ${body.slice(0, 120)}`);
+  }
+  return response.text();
+}
+function resolveDefaultCachePath() {
+  const override = process.env.BIRD_QUERY_IDS_CACHE;
+  if (override && override.trim().length > 0) {
+    return path12.resolve(override.trim());
+  }
+  return path12.join(homedir8(), ".config", "bird", DEFAULT_CACHE_FILENAME);
+}
+function parseSnapshot(raw) {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const record2 = raw;
+  const fetchedAt = typeof record2.fetchedAt === "string" ? record2.fetchedAt : null;
+  const ttlMs = typeof record2.ttlMs === "number" && Number.isFinite(record2.ttlMs) ? record2.ttlMs : null;
+  const ids = record2.ids && typeof record2.ids === "object" ? record2.ids : null;
+  const discovery = record2.discovery && typeof record2.discovery === "object" ? record2.discovery : null;
+  if (!fetchedAt || !ttlMs || !ids || !discovery) {
+    return null;
+  }
+  const pages = Array.isArray(discovery.pages) ? discovery.pages : null;
+  const bundles = Array.isArray(discovery.bundles) ? discovery.bundles : null;
+  if (!pages || !bundles) {
+    return null;
+  }
+  const normalizedIds = {};
+  for (const [key, value] of Object.entries(ids)) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      normalizedIds[key] = value.trim();
+    }
+  }
+  return {
+    fetchedAt,
+    ttlMs,
+    ids: normalizedIds,
+    discovery: {
+      pages: pages.filter((p) => typeof p === "string"),
+      bundles: bundles.filter((b) => typeof b === "string")
+    }
+  };
+}
+async function readSnapshotFromDisk(cachePath) {
+  try {
+    const raw = await readFile2(cachePath, "utf8");
+    return parseSnapshot(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+async function writeSnapshotToDisk(cachePath, snapshot) {
+  await mkdir2(path12.dirname(cachePath), { recursive: true });
+  await writeFile2(cachePath, `${JSON.stringify(snapshot, null, 2)}
+`, "utf8");
+}
+async function discoverBundles(fetchImpl) {
+  const bundles = /* @__PURE__ */ new Set();
+  for (const page of DISCOVERY_PAGES) {
+    try {
+      const html = await fetchText(fetchImpl, page);
+      for (const match of html.matchAll(BUNDLE_URL_REGEX)) {
+        bundles.add(match[0]);
+      }
+    } catch {
+    }
+  }
+  const discovered = [...bundles];
+  if (discovered.length === 0) {
+    throw new Error("No client bundles discovered; x.com layout may have changed.");
+  }
+  return discovered;
+}
+function extractOperations(bundleContents, bundleLabel, targets, discovered) {
+  for (const pattern of OPERATION_PATTERNS) {
+    pattern.regex.lastIndex = 0;
+    while (true) {
+      const match = pattern.regex.exec(bundleContents);
+      if (match === null) {
+        break;
+      }
+      const operationName = match[pattern.operationGroup];
+      const queryId = match[pattern.queryIdGroup];
+      if (!operationName || !queryId) {
+        continue;
+      }
+      if (!targets.has(operationName)) {
+        continue;
+      }
+      if (!QUERY_ID_REGEX.test(queryId)) {
+        continue;
+      }
+      if (discovered.has(operationName)) {
+        continue;
+      }
+      discovered.set(operationName, { queryId, bundle: bundleLabel });
+      if (discovered.size === targets.size) {
+        return;
+      }
+    }
+  }
+}
+async function fetchAndExtract(fetchImpl, bundleUrls, targets) {
+  const discovered = /* @__PURE__ */ new Map();
+  const CONCURRENCY = 6;
+  for (let i = 0; i < bundleUrls.length; i += CONCURRENCY) {
+    const chunk = bundleUrls.slice(i, i + CONCURRENCY);
+    await Promise.all(chunk.map(async (url2) => {
+      if (discovered.size === targets.size) {
+        return;
+      }
+      const label = url2.split("/").at(-1) ?? url2;
+      try {
+        const js = await fetchText(fetchImpl, url2);
+        extractOperations(js, label, targets, discovered);
+      } catch {
+      }
+    }));
+    if (discovered.size === targets.size) {
+      break;
+    }
+  }
+  return discovered;
+}
+function createRuntimeQueryIdStore(options = {}) {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
+  const cachePath = options.cachePath ? path12.resolve(options.cachePath) : resolveDefaultCachePath();
+  let memorySnapshot = null;
+  let loadOnce = null;
+  let refreshInFlight = null;
+  const loadSnapshot = async () => {
+    if (memorySnapshot) {
+      return memorySnapshot;
+    }
+    if (!loadOnce) {
+      loadOnce = (async () => {
+        const fromDisk = await readSnapshotFromDisk(cachePath);
+        memorySnapshot = fromDisk;
+        return fromDisk;
+      })();
+    }
+    return loadOnce;
+  };
+  const getSnapshotInfo = async () => {
+    const snapshot = await loadSnapshot();
+    if (!snapshot) {
+      return null;
+    }
+    const fetchedAtMs = new Date(snapshot.fetchedAt).getTime();
+    const ageMs = Number.isFinite(fetchedAtMs) ? Math.max(0, Date.now() - fetchedAtMs) : Number.POSITIVE_INFINITY;
+    const effectiveTtl = Number.isFinite(snapshot.ttlMs) ? snapshot.ttlMs : ttlMs;
+    const isFresh = ageMs <= effectiveTtl;
+    return { snapshot, cachePath, ageMs, isFresh };
+  };
+  const getQueryId = async (operationName) => {
+    const info = await getSnapshotInfo();
+    if (!info) {
+      return null;
+    }
+    return info.snapshot.ids[operationName] ?? null;
+  };
+  const refresh = async (operationNames, opts = {}) => {
+    if (refreshInFlight) {
+      return refreshInFlight;
+    }
+    refreshInFlight = (async () => {
+      const current = await getSnapshotInfo();
+      if (!opts.force && current?.isFresh) {
+        return current;
+      }
+      const targets = new Set(operationNames);
+      const bundleUrls = await discoverBundles(fetchImpl);
+      const discovered = await fetchAndExtract(fetchImpl, bundleUrls, targets);
+      if (discovered.size === 0) {
+        return current ?? null;
+      }
+      const ids = {};
+      for (const name of operationNames) {
+        const entry = discovered.get(name);
+        if (entry?.queryId) {
+          ids[name] = entry.queryId;
+        }
+      }
+      const snapshot = {
+        fetchedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        ttlMs,
+        ids,
+        discovery: {
+          pages: [...DISCOVERY_PAGES],
+          bundles: bundleUrls.map((url2) => url2.split("/").at(-1) ?? url2)
+        }
+      };
+      await writeSnapshotToDisk(cachePath, snapshot);
+      memorySnapshot = snapshot;
+      return getSnapshotInfo();
+    })().finally(() => {
+      refreshInFlight = null;
+    });
+    return refreshInFlight;
+  };
+  return {
+    cachePath,
+    ttlMs,
+    getSnapshotInfo,
+    getQueryId,
+    refresh,
+    clearMemory() {
+      memorySnapshot = null;
+      loadOnce = null;
+    }
+  };
+}
+var runtimeQueryIds = createRuntimeQueryIdStore();
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-base.js
+import { randomBytes as randomBytes2, randomUUID } from "node:crypto";
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/query-ids.json
+var query_ids_default = {
+  CreateTweet: "nmdAQXJDxw6-0KKF2on7eA",
+  CreateRetweet: "LFho5rIi4xcKO90p9jwG7A",
+  CreateFriendship: "8h9JVdV8dlSyqyRDJEPCsA",
+  DestroyFriendship: "ppXWuagMNXgvzx6WoXBW0Q",
+  FavoriteTweet: "lI07N6Otwv1PhnEgXILM7A",
+  DeleteBookmark: "Wlmlj2-xzyS1GN3a6cj-mQ",
+  TweetDetail: "_NvJCnIjOW__EP5-RF197A",
+  SearchTimeline: "6AAys3t42mosm_yTI_QENg",
+  Bookmarks: "RV1g3b8n_SGOHwkqKYSCFw",
+  BookmarkFolderTimeline: "KJIQpsvxrTfRIlbaRIySHQ",
+  Following: "mWYeougg_ocJS2Vr1Vt28w",
+  Followers: "SFYY3WsgwjlXSLlfnEUE4A",
+  Likes: "ETJflBunfqNa1uE1mBPCaw",
+  ExploreSidebar: "lpSN4M6qpimkF4nRFPE3nQ",
+  ExplorePage: "kheAINB_4pzRDqkzG3K-ng",
+  GenericTimelineById: "uGSr7alSjR9v6QJAIaqSKQ",
+  TrendHistory: "Sj4T-jSB9pr0Mxtsc1UKZQ",
+  AboutAccountQuery: "zs_jFPFT78rBpXv9Z3U2YQ"
+};
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-constants.js
+var TWITTER_API_BASE = "https://x.com/i/api/graphql";
+var TWITTER_GRAPHQL_POST_URL = "https://x.com/i/api/graphql";
+var TWITTER_UPLOAD_URL = "https://upload.twitter.com/i/media/upload.json";
+var TWITTER_MEDIA_METADATA_URL = "https://x.com/i/api/1.1/media/metadata/create.json";
+var TWITTER_STATUS_UPDATE_URL = "https://x.com/i/api/1.1/statuses/update.json";
+var SETTINGS_SCREEN_NAME_REGEX = /"screen_name":"([^"]+)"/;
+var SETTINGS_USER_ID_REGEX = /"user_id"\s*:\s*"(\d+)"/;
+var SETTINGS_NAME_REGEX = /"name":"([^"\\]*(?:\\.[^"\\]*)*)"/;
+var FALLBACK_QUERY_IDS = {
+  CreateTweet: "TAJw1rBsjAtdNgTdlo2oeg",
+  CreateRetweet: "ojPdsZsimiJrUGLR1sjUtA",
+  DeleteRetweet: "iQtK4dl5hBmXewYZuEOKVw",
+  CreateFriendship: "8h9JVdV8dlSyqyRDJEPCsA",
+  DestroyFriendship: "ppXWuagMNXgvzx6WoXBW0Q",
+  FavoriteTweet: "lI07N6Otwv1PhnEgXILM7A",
+  UnfavoriteTweet: "ZYKSe-w7KEslx3JhSIk5LA",
+  CreateBookmark: "aoDbu3RHznuiSkQ9aNM67Q",
+  DeleteBookmark: "Wlmlj2-xzyS1GN3a6cj-mQ",
+  TweetDetail: "97JF30KziU00483E_8elBA",
+  SearchTimeline: "M1jEez78PEfVfbQLvlWMvQ",
+  UserArticlesTweets: "8zBy9h4L90aDL02RsBcCFg",
+  UserTweets: "Wms1GvIiHXAPBaCr9KblaA",
+  Bookmarks: "RV1g3b8n_SGOHwkqKYSCFw",
+  Following: "BEkNpEt5pNETESoqMsTEGA",
+  Followers: "kuFUYP9eV1FPoEy4N-pi7w",
+  Likes: "JR2gceKucIKcVNB_9JkhsA",
+  BookmarkFolderTimeline: "KJIQpsvxrTfRIlbaRIySHQ",
+  ListOwnerships: "wQcOSjSQ8NtgxIwvYl1lMg",
+  ListMemberships: "BlEXXdARdSeL_0KyKHHvvg",
+  ListLatestTweetsTimeline: "2TemLyqrMpTeAmysdbnVqw",
+  ListByRestId: "wXzyA5vM_aVkBL9G8Vp3kw",
+  HomeTimeline: "edseUwk9sP5Phz__9TIRnA",
+  HomeLatestTimeline: "iOEZpOdfekFsxSlPQCQtPg",
+  ExploreSidebar: "lpSN4M6qpimkF4nRFPE3nQ",
+  ExplorePage: "kheAINB_4pzRDqkzG3K-ng",
+  GenericTimelineById: "uGSr7alSjR9v6QJAIaqSKQ",
+  TrendHistory: "Sj4T-jSB9pr0Mxtsc1UKZQ",
+  AboutAccountQuery: "zs_jFPFT78rBpXv9Z3U2YQ"
+};
+var QUERY_IDS = {
+  ...FALLBACK_QUERY_IDS,
+  ...query_ids_default
+};
+var TARGET_QUERY_ID_OPERATIONS = Object.keys(FALLBACK_QUERY_IDS);
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-utils.js
+function normalizeQuoteDepth(value) {
+  if (value === void 0 || value === null) {
+    return 1;
+  }
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+  return Math.max(0, Math.floor(value));
+}
+function firstText(...values) {
+  for (const value of values) {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+  }
+  return void 0;
+}
+function collectTextFields(value, keys, output) {
+  if (!value) {
+    return;
+  }
+  if (typeof value === "string") {
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectTextFields(item, keys, output);
+    }
+    return;
+  }
+  if (typeof value === "object") {
+    for (const [key, nested] of Object.entries(value)) {
+      if (keys.has(key)) {
+        if (typeof nested === "string") {
+          const trimmed = nested.trim();
+          if (trimmed) {
+            output.push(trimmed);
+          }
+          continue;
+        }
+      }
+      collectTextFields(nested, keys, output);
+    }
+  }
+}
+function uniqueOrdered(values) {
+  const seen = /* @__PURE__ */ new Set();
+  const result = [];
+  for (const value of values) {
+    if (seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    result.push(value);
+  }
+  return result;
+}
+function renderContentState(contentState) {
+  if (!contentState?.blocks || contentState.blocks.length === 0) {
+    return void 0;
+  }
+  const entityMap = /* @__PURE__ */ new Map();
+  const rawEntityMap = contentState.entityMap ?? [];
+  if (Array.isArray(rawEntityMap)) {
+    for (const entry of rawEntityMap) {
+      const key = Number.parseInt(entry.key, 10);
+      if (!Number.isNaN(key)) {
+        entityMap.set(key, entry.value);
+      }
+    }
+  } else {
+    for (const [key, value] of Object.entries(rawEntityMap)) {
+      const keyNumber = Number.parseInt(key, 10);
+      if (!Number.isNaN(keyNumber)) {
+        entityMap.set(keyNumber, value);
+      }
+    }
+  }
+  const outputLines = [];
+  let orderedListCounter = 0;
+  let previousBlockType;
+  for (const block of contentState.blocks) {
+    if (block.type !== "ordered-list-item" && previousBlockType === "ordered-list-item") {
+      orderedListCounter = 0;
+    }
+    switch (block.type) {
+      case "unstyled": {
+        const text = renderBlockText(block, entityMap);
+        if (text) {
+          outputLines.push(text);
+        }
+        break;
+      }
+      case "header-one": {
+        const text = renderBlockText(block, entityMap);
+        if (text) {
+          outputLines.push(`# ${text}`);
+        }
+        break;
+      }
+      case "header-two": {
+        const text = renderBlockText(block, entityMap);
+        if (text) {
+          outputLines.push(`## ${text}`);
+        }
+        break;
+      }
+      case "header-three": {
+        const text = renderBlockText(block, entityMap);
+        if (text) {
+          outputLines.push(`### ${text}`);
+        }
+        break;
+      }
+      case "unordered-list-item": {
+        const text = renderBlockText(block, entityMap);
+        if (text) {
+          outputLines.push(`- ${text}`);
+        }
+        break;
+      }
+      case "ordered-list-item": {
+        orderedListCounter++;
+        const text = renderBlockText(block, entityMap);
+        if (text) {
+          outputLines.push(`${orderedListCounter}. ${text}`);
+        }
+        break;
+      }
+      case "blockquote": {
+        const text = renderBlockText(block, entityMap);
+        if (text) {
+          outputLines.push(`> ${text}`);
+        }
+        break;
+      }
+      case "atomic": {
+        const entityContent = renderAtomicBlock(block, entityMap);
+        if (entityContent) {
+          outputLines.push(entityContent);
+        }
+        break;
+      }
+      default: {
+        const text = renderBlockText(block, entityMap);
+        if (text) {
+          outputLines.push(text);
+        }
+      }
+    }
+    previousBlockType = block.type;
+  }
+  const result = outputLines.join("\n\n");
+  return result.trim() || void 0;
+}
+function renderBlockText(block, entityMap) {
+  let text = block.text;
+  const linkRanges = (block.entityRanges ?? []).filter((range) => {
+    const entity = entityMap.get(range.key);
+    return entity?.type === "LINK" && entity.data.url;
+  }).sort((a, b) => b.offset - a.offset);
+  for (const range of linkRanges) {
+    const entity = entityMap.get(range.key);
+    if (entity?.data.url) {
+      const linkText = text.slice(range.offset, range.offset + range.length);
+      const markdownLink = `[${linkText}](${entity.data.url})`;
+      text = text.slice(0, range.offset) + markdownLink + text.slice(range.offset + range.length);
+    }
+  }
+  return text.trim();
+}
+function renderAtomicBlock(block, entityMap) {
+  const entityRanges = block.entityRanges ?? [];
+  if (entityRanges.length === 0) {
+    return void 0;
+  }
+  const entityKey = entityRanges[0].key;
+  const entity = entityMap.get(entityKey);
+  if (!entity) {
+    return void 0;
+  }
+  switch (entity.type) {
+    case "MARKDOWN":
+      return entity.data.markdown?.trim();
+    case "DIVIDER":
+      return "---";
+    case "TWEET":
+      if (entity.data.tweetId) {
+        return `[Embedded Tweet: https://x.com/i/status/${entity.data.tweetId}]`;
+      }
+      return void 0;
+    case "LINK":
+      if (entity.data.url) {
+        return `[Link: ${entity.data.url}]`;
+      }
+      return void 0;
+    case "IMAGE":
+      return "[Image]";
+    default:
+      return void 0;
+  }
+}
+function extractArticleText(result) {
+  const article = result?.article;
+  if (!article) {
+    return void 0;
+  }
+  const articleResult = article.article_results?.result ?? article;
+  if (process.env.BIRD_DEBUG_ARTICLE === "1") {
+    console.error("[bird][debug][article] payload:", JSON.stringify({
+      rest_id: result?.rest_id,
+      article: articleResult,
+      note_tweet: result?.note_tweet?.note_tweet_results?.result ?? null
+    }, null, 2));
+  }
+  const title = firstText(articleResult.title, article.title);
+  const contentState = article.article_results?.result?.content_state;
+  const richBody = renderContentState(contentState);
+  if (richBody) {
+    if (title) {
+      const normalizedTitle = title.trim();
+      const trimmedBody = richBody.trimStart();
+      const headingMatches = [`# ${normalizedTitle}`, `## ${normalizedTitle}`, `### ${normalizedTitle}`];
+      const hasTitle = trimmedBody === normalizedTitle || trimmedBody.startsWith(`${normalizedTitle}
+`) || headingMatches.some((heading) => trimmedBody.startsWith(heading));
+      if (!hasTitle) {
+        return `${title}
+
+${richBody}`;
+      }
+    }
+    return richBody;
+  }
+  let body = firstText(articleResult.plain_text, article.plain_text, articleResult.body?.text, articleResult.body?.richtext?.text, articleResult.body?.rich_text?.text, articleResult.content?.text, articleResult.content?.richtext?.text, articleResult.content?.rich_text?.text, articleResult.text, articleResult.richtext?.text, articleResult.rich_text?.text, article.body?.text, article.body?.richtext?.text, article.body?.rich_text?.text, article.content?.text, article.content?.richtext?.text, article.content?.rich_text?.text, article.text, article.richtext?.text, article.rich_text?.text);
+  if (body && title && body.trim() === title.trim()) {
+    body = void 0;
+  }
+  if (!body) {
+    const collected = [];
+    collectTextFields(articleResult, /* @__PURE__ */ new Set(["text", "title"]), collected);
+    collectTextFields(article, /* @__PURE__ */ new Set(["text", "title"]), collected);
+    const unique = uniqueOrdered(collected);
+    const filtered = title ? unique.filter((value) => value !== title) : unique;
+    if (filtered.length > 0) {
+      body = filtered.join("\n\n");
+    }
+  }
+  if (title && body && !body.startsWith(title)) {
+    return `${title}
+
+${body}`;
+  }
+  return body ?? title;
+}
+function extractNoteTweetText(result) {
+  const note = result?.note_tweet?.note_tweet_results?.result;
+  if (!note) {
+    return void 0;
+  }
+  return firstText(note.text, note.richtext?.text, note.rich_text?.text, note.content?.text, note.content?.richtext?.text, note.content?.rich_text?.text);
+}
+function extractTweetText(result) {
+  return extractArticleText(result) ?? extractNoteTweetText(result) ?? firstText(result?.legacy?.full_text);
+}
+function extractArticleMetadata(result) {
+  const article = result?.article;
+  if (!article) {
+    return void 0;
+  }
+  const articleResult = article.article_results?.result ?? article;
+  const title = firstText(articleResult.title, article.title);
+  if (!title) {
+    return void 0;
+  }
+  const previewText = firstText(articleResult.preview_text, article.preview_text);
+  return { title, previewText };
+}
+function extractMedia(result) {
+  const rawMedia = result?.legacy?.extended_entities?.media ?? result?.legacy?.entities?.media;
+  if (!rawMedia || rawMedia.length === 0) {
+    return void 0;
+  }
+  const media = [];
+  for (const item of rawMedia) {
+    if (!item.type || !item.media_url_https) {
+      continue;
+    }
+    const mediaItem = {
+      type: item.type,
+      url: item.media_url_https
+    };
+    const sizes = item.sizes;
+    if (sizes?.large) {
+      mediaItem.width = sizes.large.w;
+      mediaItem.height = sizes.large.h;
+    } else if (sizes?.medium) {
+      mediaItem.width = sizes.medium.w;
+      mediaItem.height = sizes.medium.h;
+    }
+    if (sizes?.small) {
+      mediaItem.previewUrl = `${item.media_url_https}:small`;
+    }
+    if ((item.type === "video" || item.type === "animated_gif") && item.video_info?.variants) {
+      const mp4Variants = item.video_info.variants.filter((v) => v.content_type === "video/mp4" && typeof v.url === "string");
+      const mp4WithBitrate = mp4Variants.filter((v) => typeof v.bitrate === "number").sort((a, b) => b.bitrate - a.bitrate);
+      const selectedVariant = mp4WithBitrate[0] ?? mp4Variants[0];
+      if (selectedVariant) {
+        mediaItem.videoUrl = selectedVariant.url;
+      }
+      if (typeof item.video_info.duration_millis === "number") {
+        mediaItem.durationMs = item.video_info.duration_millis;
+      }
+    }
+    media.push(mediaItem);
+  }
+  return media.length > 0 ? media : void 0;
+}
+function unwrapTweetResult(result) {
+  if (!result) {
+    return void 0;
+  }
+  if (result.tweet) {
+    return result.tweet;
+  }
+  return result;
+}
+function mapTweetResult(result, quoteDepthOrOptions) {
+  const options = typeof quoteDepthOrOptions === "number" ? { quoteDepth: quoteDepthOrOptions } : quoteDepthOrOptions;
+  const { quoteDepth, includeRaw = false } = options;
+  const userResult = result?.core?.user_results?.result;
+  const userLegacy = userResult?.legacy;
+  const userCore = userResult?.core;
+  const username = userLegacy?.screen_name ?? userCore?.screen_name;
+  const name = userLegacy?.name ?? userCore?.name ?? username;
+  const userId = userResult?.rest_id;
+  if (!result?.rest_id || !username) {
+    return void 0;
+  }
+  const text = extractTweetText(result);
+  if (!text) {
+    return void 0;
+  }
+  let quotedTweet;
+  if (quoteDepth > 0) {
+    const quotedResult = unwrapTweetResult(result.quoted_status_result?.result);
+    if (quotedResult) {
+      quotedTweet = mapTweetResult(quotedResult, { quoteDepth: quoteDepth - 1, includeRaw });
+    }
+  }
+  const media = extractMedia(result);
+  const article = extractArticleMetadata(result);
+  const tweetData = {
+    id: result.rest_id,
+    text,
+    createdAt: result.legacy?.created_at,
+    replyCount: result.legacy?.reply_count,
+    retweetCount: result.legacy?.retweet_count,
+    likeCount: result.legacy?.favorite_count,
+    conversationId: result.legacy?.conversation_id_str,
+    inReplyToStatusId: result.legacy?.in_reply_to_status_id_str ?? void 0,
+    author: {
+      username,
+      name: name || username
+    },
+    authorId: userId,
+    quotedTweet,
+    media,
+    article
+  };
+  if (includeRaw) {
+    tweetData._raw = result;
+  }
+  return tweetData;
+}
+function findTweetInInstructions(instructions, tweetId) {
+  if (!instructions) {
+    return void 0;
+  }
+  for (const instruction of instructions) {
+    for (const entry of instruction.entries || []) {
+      const result = entry.content?.itemContent?.tweet_results?.result;
+      if (result?.rest_id === tweetId) {
+        return result;
+      }
+    }
+  }
+  return void 0;
+}
+function collectTweetResultsFromEntry(entry) {
+  const results = [];
+  const pushResult = (result) => {
+    if (result?.rest_id) {
+      results.push(result);
+    }
+  };
+  const content = entry.content;
+  pushResult(content?.itemContent?.tweet_results?.result);
+  pushResult(content?.item?.itemContent?.tweet_results?.result);
+  for (const item of content?.items ?? []) {
+    pushResult(item?.item?.itemContent?.tweet_results?.result);
+    pushResult(item?.itemContent?.tweet_results?.result);
+    pushResult(item?.content?.itemContent?.tweet_results?.result);
+  }
+  return results;
+}
+function parseTweetsFromInstructions(instructions, quoteDepthOrOptions) {
+  const options = typeof quoteDepthOrOptions === "number" ? { quoteDepth: quoteDepthOrOptions } : quoteDepthOrOptions;
+  const { quoteDepth, includeRaw = false } = options;
+  const tweets = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const instruction of instructions ?? []) {
+    for (const entry of instruction.entries ?? []) {
+      const results = collectTweetResultsFromEntry(entry);
+      for (const result of results) {
+        const mapped = mapTweetResult(result, { quoteDepth, includeRaw });
+        if (!mapped || seen.has(mapped.id)) {
+          continue;
+        }
+        seen.add(mapped.id);
+        tweets.push(mapped);
+      }
+    }
+  }
+  return tweets;
+}
+function extractCursorFromInstructions(instructions, cursorType = "Bottom") {
+  for (const instruction of instructions ?? []) {
+    for (const entry of instruction.entries ?? []) {
+      const content = entry.content;
+      if (content?.cursorType === cursorType && typeof content.value === "string" && content.value.length > 0) {
+        return content.value;
+      }
+    }
+  }
+  return void 0;
+}
+function parseUsersFromInstructions(instructions) {
+  if (!instructions) {
+    return [];
+  }
+  const users = [];
+  for (const instruction of instructions) {
+    if (!instruction.entries) {
+      continue;
+    }
+    for (const entry of instruction.entries) {
+      const content = entry?.content;
+      const rawUserResult = content?.itemContent?.user_results?.result;
+      const userResult = rawUserResult?.__typename === "UserWithVisibilityResults" && rawUserResult.user ? rawUserResult.user : rawUserResult;
+      if (!userResult || userResult.__typename !== "User") {
+        continue;
+      }
+      const legacy = userResult.legacy;
+      const core = userResult.core;
+      const username = legacy?.screen_name ?? core?.screen_name;
+      if (!userResult.rest_id || !username) {
+        continue;
+      }
+      users.push({
+        id: userResult.rest_id,
+        username,
+        name: legacy?.name ?? core?.name ?? username,
+        description: legacy?.description,
+        followersCount: legacy?.followers_count,
+        followingCount: legacy?.friends_count,
+        isBlueVerified: userResult.is_blue_verified,
+        profileImageUrl: legacy?.profile_image_url_https ?? userResult.avatar?.image_url,
+        createdAt: legacy?.created_at ?? core?.created_at
+      });
+    }
+  }
+  return users;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-base.js
+var TwitterClientBase = class {
+  authToken;
+  ct0;
+  cookieHeader;
+  userAgent;
+  timeoutMs;
+  quoteDepth;
+  clientUuid;
+  clientDeviceId;
+  clientUserId;
+  constructor(options) {
+    if (!options.cookies.authToken || !options.cookies.ct0) {
+      throw new Error("Both authToken and ct0 cookies are required");
+    }
+    this.authToken = options.cookies.authToken;
+    this.ct0 = options.cookies.ct0;
+    this.cookieHeader = options.cookies.cookieHeader || `auth_token=${this.authToken}; ct0=${this.ct0}`;
+    this.userAgent = options.userAgent || "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+    this.timeoutMs = options.timeoutMs;
+    this.quoteDepth = normalizeQuoteDepth(options.quoteDepth);
+    this.clientUuid = randomUUID();
+    this.clientDeviceId = randomUUID();
+  }
+  async sleep(ms) {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+  async getQueryId(operationName) {
+    const cached3 = await runtimeQueryIds.getQueryId(operationName);
+    return cached3 ?? QUERY_IDS[operationName];
+  }
+  async refreshQueryIds() {
+    if (process.env.NODE_ENV === "test") {
+      return;
+    }
+    try {
+      await runtimeQueryIds.refresh(TARGET_QUERY_ID_OPERATIONS, { force: true });
+    } catch {
+    }
+  }
+  async withRefreshedQueryIdsOn404(attempt) {
+    const firstAttempt = await attempt();
+    if (firstAttempt.success || !firstAttempt.had404) {
+      return { result: firstAttempt, refreshed: false };
+    }
+    await this.refreshQueryIds();
+    const secondAttempt = await attempt();
+    return { result: secondAttempt, refreshed: true };
+  }
+  async getTweetDetailQueryIds() {
+    const primary = await this.getQueryId("TweetDetail");
+    return Array.from(/* @__PURE__ */ new Set([primary, "97JF30KziU00483E_8elBA", "aFvUsJm2c-oDkJV75blV6g"]));
+  }
+  async getSearchTimelineQueryIds() {
+    const primary = await this.getQueryId("SearchTimeline");
+    return Array.from(/* @__PURE__ */ new Set([primary, "M1jEez78PEfVfbQLvlWMvQ", "5h0kNbk3ii97rmfY6CdgAA", "Tp1sewRU1AsZpBWhqCZicQ"]));
+  }
+  async fetchWithTimeout(url2, init) {
+    if (!this.timeoutMs || this.timeoutMs <= 0) {
+      return fetch(url2, init);
+    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      return await fetch(url2, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+  getHeaders() {
+    return this.getJsonHeaders();
+  }
+  createTransactionId() {
+    return randomBytes2(16).toString("hex");
+  }
+  getBaseHeaders() {
+    const headers = {
+      accept: "*/*",
+      "accept-language": "en-US,en;q=0.9",
+      authorization: "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA",
+      "x-csrf-token": this.ct0,
+      "x-twitter-auth-type": "OAuth2Session",
+      "x-twitter-active-user": "yes",
+      "x-twitter-client-language": "en",
+      "x-client-uuid": this.clientUuid,
+      "x-twitter-client-deviceid": this.clientDeviceId,
+      "x-client-transaction-id": this.createTransactionId(),
+      cookie: this.cookieHeader,
+      "user-agent": this.userAgent,
+      origin: "https://x.com",
+      referer: "https://x.com/"
+    };
+    if (this.clientUserId) {
+      headers["x-twitter-client-user-id"] = this.clientUserId;
+    }
+    return headers;
+  }
+  getJsonHeaders() {
+    return {
+      ...this.getBaseHeaders(),
+      "content-type": "application/json"
+    };
+  }
+  getUploadHeaders() {
+    return this.getBaseHeaders();
+  }
+  async ensureClientUserId() {
+    if (process.env.NODE_ENV === "test") {
+      return;
+    }
+    if (this.clientUserId) {
+      return;
+    }
+    const result = await this.getCurrentUser();
+    if (result.success && result.user?.id) {
+      this.clientUserId = result.user.id;
+    }
+  }
+};
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-bookmarks.js
+function withBookmarks(Base) {
+  class TwitterClientBookmarks extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    async unbookmark(tweetId) {
+      const variables = { tweet_id: tweetId };
+      let queryId = await this.getQueryId("DeleteBookmark");
+      let urlWithOperation = `${TWITTER_API_BASE}/${queryId}/DeleteBookmark`;
+      const buildBody = () => JSON.stringify({ variables, queryId });
+      const buildHeaders = () => ({ ...this.getHeaders(), referer: `https://x.com/i/status/${tweetId}` });
+      let body = buildBody();
+      const parseResponse = async (response) => {
+        if (!response.ok) {
+          const text = await response.text();
+          return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}` };
+        }
+        const data = await response.json();
+        if (data.errors && data.errors.length > 0) {
+          return { success: false, error: data.errors.map((e) => e.message).join(", ") };
+        }
+        return { success: true };
+      };
+      try {
+        let response = await this.fetchWithTimeout(urlWithOperation, {
+          method: "POST",
+          headers: buildHeaders(),
+          body
+        });
+        if (response.status === 404) {
+          await this.refreshQueryIds();
+          queryId = await this.getQueryId("DeleteBookmark");
+          urlWithOperation = `${TWITTER_API_BASE}/${queryId}/DeleteBookmark`;
+          body = buildBody();
+          response = await this.fetchWithTimeout(urlWithOperation, {
+            method: "POST",
+            headers: buildHeaders(),
+            body
+          });
+          if (response.status === 404) {
+            const retry = await this.fetchWithTimeout(TWITTER_GRAPHQL_POST_URL, {
+              method: "POST",
+              headers: buildHeaders(),
+              body
+            });
+            return parseResponse(retry);
+          }
+        }
+        return parseResponse(response);
+      } catch (error2) {
+        return { success: false, error: error2 instanceof Error ? error2.message : String(error2) };
+      }
+    }
+  }
+  return TwitterClientBookmarks;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-engagement.js
+function withEngagement(Base) {
+  class TwitterClientEngagement extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    async performEngagementMutation(operationName, tweetId) {
+      await this.ensureClientUserId();
+      const variables = operationName === "DeleteRetweet" ? { tweet_id: tweetId, source_tweet_id: tweetId } : { tweet_id: tweetId };
+      let queryId = await this.getQueryId(operationName);
+      let urlWithOperation = `${TWITTER_API_BASE}/${queryId}/${operationName}`;
+      const buildBody = () => JSON.stringify({ variables, queryId });
+      const buildHeaders = () => ({ ...this.getHeaders(), referer: `https://x.com/i/status/${tweetId}` });
+      let body = buildBody();
+      const parseResponse = async (response) => {
+        if (!response.ok) {
+          const text = await response.text();
+          return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}` };
+        }
+        const data = await response.json();
+        if (data.errors && data.errors.length > 0) {
+          return { success: false, error: data.errors.map((e) => e.message).join(", ") };
+        }
+        return { success: true };
+      };
+      try {
+        let response = await this.fetchWithTimeout(urlWithOperation, {
+          method: "POST",
+          headers: buildHeaders(),
+          body
+        });
+        if (response.status === 404) {
+          await this.refreshQueryIds();
+          queryId = await this.getQueryId(operationName);
+          urlWithOperation = `${TWITTER_API_BASE}/${queryId}/${operationName}`;
+          body = buildBody();
+          response = await this.fetchWithTimeout(urlWithOperation, {
+            method: "POST",
+            headers: buildHeaders(),
+            body
+          });
+          if (response.status === 404) {
+            const retry = await this.fetchWithTimeout(TWITTER_GRAPHQL_POST_URL, {
+              method: "POST",
+              headers: buildHeaders(),
+              body
+            });
+            return parseResponse(retry);
+          }
+        }
+        return parseResponse(response);
+      } catch (error2) {
+        return { success: false, error: error2 instanceof Error ? error2.message : String(error2) };
+      }
+    }
+    /** Like a tweet. */
+    async like(tweetId) {
+      return this.performEngagementMutation("FavoriteTweet", tweetId);
+    }
+    /** Remove a like from a tweet. */
+    async unlike(tweetId) {
+      return this.performEngagementMutation("UnfavoriteTweet", tweetId);
+    }
+    /** Retweet a tweet. */
+    async retweet(tweetId) {
+      return this.performEngagementMutation("CreateRetweet", tweetId);
+    }
+    /** Remove a retweet. */
+    async unretweet(tweetId) {
+      return this.performEngagementMutation("DeleteRetweet", tweetId);
+    }
+    /** Bookmark a tweet. */
+    async bookmark(tweetId) {
+      return this.performEngagementMutation("CreateBookmark", tweetId);
+    }
+  }
+  return TwitterClientEngagement;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-follow.js
+function withFollow(Base) {
+  class TwitterClientFollow extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    /**
+     * Follow a user by their user ID
+     */
+    async follow(userId) {
+      await this.ensureClientUserId();
+      const restResult = await this.followViaRest(userId, "create");
+      if (restResult.success) {
+        return restResult;
+      }
+      return this.followViaGraphQL(userId, true);
+    }
+    /**
+     * Unfollow a user by their user ID
+     */
+    async unfollow(userId) {
+      await this.ensureClientUserId();
+      const restResult = await this.followViaRest(userId, "destroy");
+      if (restResult.success) {
+        return restResult;
+      }
+      return this.followViaGraphQL(userId, false);
+    }
+    async followViaRest(userId, action) {
+      const urls = [
+        `https://x.com/i/api/1.1/friendships/${action}.json`,
+        `https://api.twitter.com/1.1/friendships/${action}.json`
+      ];
+      const params = new URLSearchParams({
+        user_id: userId,
+        skip_status: "true"
+      });
+      let lastError;
+      for (const url2 of urls) {
+        try {
+          const response = await this.fetchWithTimeout(url2, {
+            method: "POST",
+            headers: {
+              ...this.getBaseHeaders(),
+              "content-type": "application/x-www-form-urlencoded"
+            },
+            body: params.toString()
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            try {
+              const errorData = JSON.parse(text);
+              if (errorData.errors && errorData.errors.length > 0) {
+                const error2 = errorData.errors[0];
+                if (error2.code === 160) {
+                  return { success: true };
+                }
+                if (error2.code === 162) {
+                  return { success: false, error: "You have been blocked from following this account" };
+                }
+                if (error2.code === 108) {
+                  return { success: false, error: "User not found" };
+                }
+                lastError = `${error2.message} (code ${error2.code})`;
+                continue;
+              }
+            } catch {
+            }
+            lastError = `HTTP ${response.status}: ${text.slice(0, 200)}`;
+            continue;
+          }
+          const data = await response.json();
+          if (data.errors && data.errors.length > 0) {
+            lastError = data.errors.map((e) => e.message).join(", ");
+            continue;
+          }
+          if (data.id_str || data.screen_name) {
+            return {
+              success: true,
+              userId: data.id_str,
+              username: data.screen_name
+            };
+          }
+          return { success: true };
+        } catch (error2) {
+          lastError = error2 instanceof Error ? error2.message : String(error2);
+        }
+      }
+      return { success: false, error: lastError ?? `Unknown error during ${action}` };
+    }
+    async followViaGraphQL(userId, follow) {
+      const operationName = follow ? "CreateFriendship" : "DestroyFriendship";
+      const variables = {
+        user_id: userId
+      };
+      const tryOnce = async () => {
+        let lastError;
+        let had404 = false;
+        const queryIds = await this.getFollowQueryIds(follow);
+        for (const queryId of queryIds) {
+          const url2 = `${TWITTER_API_BASE}/${queryId}/${operationName}`;
+          try {
+            const response = await this.fetchWithTimeout(url2, {
+              method: "POST",
+              headers: this.getHeaders(),
+              body: JSON.stringify({ variables, queryId })
+            });
+            if (response.status === 404) {
+              had404 = true;
+              lastError = "HTTP 404";
+              continue;
+            }
+            if (!response.ok) {
+              const text = await response.text();
+              lastError = `HTTP ${response.status}: ${text.slice(0, 200)}`;
+              continue;
+            }
+            const data = await response.json();
+            if (data.errors && data.errors.length > 0) {
+              lastError = data.errors.map((e) => e.message).join(", ");
+              continue;
+            }
+            const result = data.data?.user?.result;
+            return {
+              success: true,
+              userId: result?.rest_id,
+              username: result?.legacy?.screen_name,
+              had404
+            };
+          } catch (error2) {
+            lastError = error2 instanceof Error ? error2.message : String(error2);
+          }
+        }
+        return {
+          success: false,
+          error: lastError ?? `Unknown error during ${operationName}`,
+          had404
+        };
+      };
+      const firstAttempt = await tryOnce();
+      if (firstAttempt.success) {
+        return { success: true, userId: firstAttempt.userId, username: firstAttempt.username };
+      }
+      if (firstAttempt.had404) {
+        await this.refreshQueryIds();
+        const secondAttempt = await tryOnce();
+        if (secondAttempt.success) {
+          return { success: true, userId: secondAttempt.userId, username: secondAttempt.username };
+        }
+        return { success: false, error: secondAttempt.error };
+      }
+      return { success: false, error: firstAttempt.error };
+    }
+    async getFollowQueryIds(follow) {
+      const primary = await this.getQueryId(follow ? "CreateFriendship" : "DestroyFriendship");
+      const fallbacks = follow ? ["8h9JVdV8dlSyqyRDJEPCsA", "OPwKc1HXnBT_bWXfAlo-9g"] : ["ppXWuagMNXgvzx6WoXBW0Q", "8h9JVdV8dlSyqyRDJEPCsA"];
+      return Array.from(/* @__PURE__ */ new Set([primary, ...fallbacks]));
+    }
+  }
+  return TwitterClientFollow;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/runtime-features.js
+import { existsSync as existsSync8, readFileSync as readFileSync3 } from "node:fs";
+import { homedir as homedir9 } from "node:os";
+import path13 from "node:path";
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/features.json
+var features_default = {
+  global: {
+    responsive_web_grok_annotations_enabled: false,
+    post_ctas_fetch_enabled: true,
+    responsive_web_graphql_exclude_directive_enabled: true
+  },
+  sets: {
+    lists: {
+      blue_business_profile_image_shape_enabled: true,
+      tweetypie_unmention_optimization_enabled: true,
+      responsive_web_text_conversations_enabled: false,
+      interactive_text_enabled: true,
+      vibe_api_enabled: true,
+      responsive_web_twitter_blue_verified_badge_is_enabled: true
+    }
+  }
+};
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/runtime-features.js
+var DEFAULT_CACHE_FILENAME2 = "features.json";
+var cachedOverrides = null;
+function normalizeFeatureMap(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  const result = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === "boolean") {
+      result[key] = entry;
+    }
+  }
+  return result;
+}
+function normalizeOverrides(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { global: {}, sets: {} };
+  }
+  const record2 = value;
+  const global = normalizeFeatureMap(record2.global);
+  const sets = {};
+  const rawSets = record2.sets && typeof record2.sets === "object" && !Array.isArray(record2.sets) ? record2.sets : {};
+  for (const [setName, setValue] of Object.entries(rawSets)) {
+    const normalized = normalizeFeatureMap(setValue);
+    if (Object.keys(normalized).length > 0) {
+      sets[setName] = normalized;
+    }
+  }
+  return { global, sets };
+}
+function mergeOverrides(base, next) {
+  const sets = { ...base.sets };
+  for (const [setName, overrides] of Object.entries(next.sets)) {
+    const existing = sets[setName];
+    sets[setName] = existing ? { ...existing, ...overrides } : { ...overrides };
+  }
+  return {
+    global: { ...base.global, ...next.global },
+    sets
+  };
+}
+function resolveFeaturesCachePath() {
+  const override = process.env.BIRD_FEATURES_CACHE ?? process.env.BIRD_FEATURES_PATH;
+  if (override && override.trim().length > 0) {
+    return path13.resolve(override.trim());
+  }
+  return path13.join(homedir9(), ".config", "bird", DEFAULT_CACHE_FILENAME2);
+}
+function readOverridesFromFile(cachePath) {
+  if (!existsSync8(cachePath)) {
+    return null;
+  }
+  try {
+    const raw = readFileSync3(cachePath, "utf8");
+    return normalizeOverrides(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+function readOverridesFromEnv() {
+  const raw = process.env.BIRD_FEATURES_JSON;
+  if (!raw || raw.trim().length === 0) {
+    return null;
+  }
+  try {
+    return normalizeOverrides(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+function loadFeatureOverrides() {
+  if (cachedOverrides) {
+    return cachedOverrides;
+  }
+  const base = normalizeOverrides(features_default);
+  const fromFile = readOverridesFromFile(resolveFeaturesCachePath());
+  const fromEnv = readOverridesFromEnv();
+  let merged = base;
+  if (fromFile) {
+    merged = mergeOverrides(merged, fromFile);
+  }
+  if (fromEnv) {
+    merged = mergeOverrides(merged, fromEnv);
+  }
+  cachedOverrides = merged;
+  return merged;
+}
+function applyFeatureOverrides(setName, base) {
+  const overrides = loadFeatureOverrides();
+  const globalOverrides = overrides.global;
+  const setOverrides = overrides.sets[setName];
+  if (Object.keys(globalOverrides).length === 0 && (!setOverrides || Object.keys(setOverrides).length === 0)) {
+    return base;
+  }
+  if (setOverrides) {
+    return {
+      ...base,
+      ...globalOverrides,
+      ...setOverrides
+    };
+  }
+  return {
+    ...base,
+    ...globalOverrides
+  };
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-features.js
+function buildArticleFeatures() {
+  return applyFeatureOverrides("article", {
+    rweb_video_screen_enabled: true,
+    profile_label_improvements_pcf_label_in_post_enabled: true,
+    responsive_web_profile_redirect_enabled: true,
+    rweb_tipjar_consumption_enabled: true,
+    verified_phone_label_enabled: false,
+    creator_subscriptions_tweet_preview_api_enabled: true,
+    responsive_web_graphql_timeline_navigation_enabled: true,
+    responsive_web_graphql_exclude_directive_enabled: true,
+    responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+    premium_content_api_read_enabled: false,
+    communities_web_enable_tweet_community_results_fetch: true,
+    c9s_tweet_anatomy_moderator_badge_enabled: true,
+    responsive_web_grok_analyze_button_fetch_trends_enabled: false,
+    responsive_web_grok_analyze_post_followups_enabled: false,
+    responsive_web_grok_annotations_enabled: false,
+    responsive_web_jetfuel_frame: true,
+    post_ctas_fetch_enabled: true,
+    responsive_web_grok_share_attachment_enabled: true,
+    articles_preview_enabled: true,
+    responsive_web_edit_tweet_api_enabled: true,
+    graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+    view_counts_everywhere_api_enabled: true,
+    longform_notetweets_consumption_enabled: true,
+    responsive_web_twitter_article_tweet_consumption_enabled: true,
+    tweet_awards_web_tipping_enabled: false,
+    responsive_web_grok_show_grok_translated_post: false,
+    responsive_web_grok_analysis_button_from_backend: true,
+    creator_subscriptions_quote_tweet_preview_enabled: false,
+    freedom_of_speech_not_reach_fetch_enabled: true,
+    standardized_nudges_misinfo: true,
+    tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+    longform_notetweets_rich_text_read_enabled: true,
+    longform_notetweets_inline_media_enabled: true,
+    responsive_web_grok_image_annotation_enabled: true,
+    responsive_web_grok_imagine_annotation_enabled: true,
+    responsive_web_grok_community_note_auto_translation_is_enabled: false,
+    responsive_web_enhance_cards_enabled: false
+  });
+}
+function buildTweetDetailFeatures() {
+  return applyFeatureOverrides("tweetDetail", {
+    ...buildArticleFeatures(),
+    responsive_web_graphql_exclude_directive_enabled: true,
+    communities_web_enable_tweet_community_results_fetch: true,
+    responsive_web_twitter_article_plain_text_enabled: true,
+    responsive_web_twitter_article_seed_tweet_detail_enabled: true,
+    responsive_web_twitter_article_seed_tweet_summary_enabled: true,
+    longform_notetweets_rich_text_read_enabled: true,
+    longform_notetweets_inline_media_enabled: true,
+    responsive_web_edit_tweet_api_enabled: true,
+    tweet_awards_web_tipping_enabled: false,
+    creator_subscriptions_quote_tweet_preview_enabled: false,
+    verified_phone_label_enabled: false
+  });
+}
+function buildArticleFieldToggles() {
+  return {
+    withPayments: false,
+    withAuxiliaryUserLabels: false,
+    withArticleRichContentState: true,
+    withArticlePlainText: true,
+    withGrokAnalyze: false,
+    withDisallowedReplyControls: false
+  };
+}
+function buildSearchFeatures() {
+  return applyFeatureOverrides("search", {
+    rweb_video_screen_enabled: true,
+    profile_label_improvements_pcf_label_in_post_enabled: true,
+    responsive_web_profile_redirect_enabled: true,
+    rweb_tipjar_consumption_enabled: true,
+    verified_phone_label_enabled: false,
+    creator_subscriptions_tweet_preview_api_enabled: true,
+    responsive_web_graphql_timeline_navigation_enabled: true,
+    responsive_web_graphql_exclude_directive_enabled: true,
+    responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+    premium_content_api_read_enabled: false,
+    communities_web_enable_tweet_community_results_fetch: true,
+    c9s_tweet_anatomy_moderator_badge_enabled: true,
+    responsive_web_grok_analyze_button_fetch_trends_enabled: false,
+    responsive_web_grok_analyze_post_followups_enabled: false,
+    responsive_web_grok_annotations_enabled: false,
+    responsive_web_jetfuel_frame: true,
+    post_ctas_fetch_enabled: true,
+    responsive_web_grok_share_attachment_enabled: true,
+    responsive_web_edit_tweet_api_enabled: true,
+    graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+    view_counts_everywhere_api_enabled: true,
+    longform_notetweets_consumption_enabled: true,
+    responsive_web_twitter_article_tweet_consumption_enabled: true,
+    tweet_awards_web_tipping_enabled: false,
+    responsive_web_grok_show_grok_translated_post: false,
+    responsive_web_grok_analysis_button_from_backend: true,
+    creator_subscriptions_quote_tweet_preview_enabled: false,
+    freedom_of_speech_not_reach_fetch_enabled: true,
+    standardized_nudges_misinfo: true,
+    tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+    rweb_video_timestamps_enabled: true,
+    longform_notetweets_rich_text_read_enabled: true,
+    longform_notetweets_inline_media_enabled: true,
+    responsive_web_grok_image_annotation_enabled: true,
+    responsive_web_grok_imagine_annotation_enabled: true,
+    responsive_web_grok_community_note_auto_translation_is_enabled: false,
+    articles_preview_enabled: true,
+    responsive_web_enhance_cards_enabled: false
+  });
+}
+function buildTweetCreateFeatures() {
+  return applyFeatureOverrides("tweetCreate", {
+    rweb_video_screen_enabled: true,
+    creator_subscriptions_tweet_preview_api_enabled: true,
+    premium_content_api_read_enabled: false,
+    communities_web_enable_tweet_community_results_fetch: true,
+    c9s_tweet_anatomy_moderator_badge_enabled: true,
+    responsive_web_grok_analyze_button_fetch_trends_enabled: false,
+    responsive_web_grok_analyze_post_followups_enabled: false,
+    responsive_web_grok_annotations_enabled: false,
+    responsive_web_jetfuel_frame: true,
+    post_ctas_fetch_enabled: true,
+    responsive_web_grok_share_attachment_enabled: true,
+    responsive_web_edit_tweet_api_enabled: true,
+    graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+    view_counts_everywhere_api_enabled: true,
+    longform_notetweets_consumption_enabled: true,
+    responsive_web_twitter_article_tweet_consumption_enabled: true,
+    tweet_awards_web_tipping_enabled: false,
+    responsive_web_grok_show_grok_translated_post: false,
+    responsive_web_grok_analysis_button_from_backend: true,
+    creator_subscriptions_quote_tweet_preview_enabled: false,
+    longform_notetweets_rich_text_read_enabled: true,
+    longform_notetweets_inline_media_enabled: true,
+    profile_label_improvements_pcf_label_in_post_enabled: true,
+    responsive_web_profile_redirect_enabled: false,
+    rweb_tipjar_consumption_enabled: true,
+    verified_phone_label_enabled: false,
+    articles_preview_enabled: true,
+    responsive_web_grok_community_note_auto_translation_is_enabled: false,
+    responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+    freedom_of_speech_not_reach_fetch_enabled: true,
+    standardized_nudges_misinfo: true,
+    tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+    responsive_web_grok_image_annotation_enabled: true,
+    responsive_web_grok_imagine_annotation_enabled: true,
+    responsive_web_graphql_timeline_navigation_enabled: true,
+    responsive_web_enhance_cards_enabled: false
+  });
+}
+function buildTimelineFeatures() {
+  return applyFeatureOverrides("timeline", {
+    ...buildSearchFeatures(),
+    blue_business_profile_image_shape_enabled: true,
+    responsive_web_text_conversations_enabled: false,
+    tweetypie_unmention_optimization_enabled: true,
+    vibe_api_enabled: true,
+    responsive_web_twitter_blue_verified_badge_is_enabled: true,
+    interactive_text_enabled: true,
+    longform_notetweets_richtext_consumption_enabled: true,
+    responsive_web_media_download_video_enabled: false
+  });
+}
+function buildBookmarksFeatures() {
+  return applyFeatureOverrides("bookmarks", {
+    ...buildTimelineFeatures(),
+    graphql_timeline_v2_bookmark_timeline: true
+  });
+}
+function buildLikesFeatures() {
+  return applyFeatureOverrides("likes", buildTimelineFeatures());
+}
+function buildListsFeatures() {
+  return applyFeatureOverrides("lists", {
+    rweb_video_screen_enabled: true,
+    profile_label_improvements_pcf_label_in_post_enabled: true,
+    responsive_web_profile_redirect_enabled: true,
+    rweb_tipjar_consumption_enabled: true,
+    verified_phone_label_enabled: false,
+    creator_subscriptions_tweet_preview_api_enabled: true,
+    responsive_web_graphql_timeline_navigation_enabled: true,
+    responsive_web_graphql_exclude_directive_enabled: true,
+    responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+    premium_content_api_read_enabled: false,
+    communities_web_enable_tweet_community_results_fetch: true,
+    c9s_tweet_anatomy_moderator_badge_enabled: true,
+    responsive_web_grok_analyze_button_fetch_trends_enabled: false,
+    responsive_web_grok_analyze_post_followups_enabled: false,
+    responsive_web_grok_annotations_enabled: false,
+    responsive_web_jetfuel_frame: true,
+    post_ctas_fetch_enabled: true,
+    responsive_web_grok_share_attachment_enabled: true,
+    articles_preview_enabled: true,
+    responsive_web_edit_tweet_api_enabled: true,
+    graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+    view_counts_everywhere_api_enabled: true,
+    longform_notetweets_consumption_enabled: true,
+    responsive_web_twitter_article_tweet_consumption_enabled: true,
+    tweet_awards_web_tipping_enabled: false,
+    responsive_web_grok_show_grok_translated_post: false,
+    responsive_web_grok_analysis_button_from_backend: true,
+    creator_subscriptions_quote_tweet_preview_enabled: false,
+    freedom_of_speech_not_reach_fetch_enabled: true,
+    standardized_nudges_misinfo: true,
+    tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+    longform_notetweets_rich_text_read_enabled: true,
+    longform_notetweets_inline_media_enabled: true,
+    responsive_web_grok_image_annotation_enabled: true,
+    responsive_web_grok_imagine_annotation_enabled: true,
+    responsive_web_grok_community_note_auto_translation_is_enabled: false,
+    responsive_web_enhance_cards_enabled: false,
+    blue_business_profile_image_shape_enabled: false,
+    responsive_web_text_conversations_enabled: false,
+    tweetypie_unmention_optimization_enabled: true,
+    vibe_api_enabled: false,
+    interactive_text_enabled: false
+  });
+}
+function buildHomeTimelineFeatures() {
+  return applyFeatureOverrides("homeTimeline", {
+    ...buildTimelineFeatures()
+  });
+}
+function buildUserTweetsFeatures() {
+  return applyFeatureOverrides("userTweets", {
+    rweb_video_screen_enabled: false,
+    profile_label_improvements_pcf_label_in_post_enabled: true,
+    responsive_web_profile_redirect_enabled: false,
+    rweb_tipjar_consumption_enabled: true,
+    verified_phone_label_enabled: false,
+    creator_subscriptions_tweet_preview_api_enabled: true,
+    responsive_web_graphql_timeline_navigation_enabled: true,
+    responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+    premium_content_api_read_enabled: false,
+    communities_web_enable_tweet_community_results_fetch: true,
+    c9s_tweet_anatomy_moderator_badge_enabled: true,
+    responsive_web_grok_analyze_button_fetch_trends_enabled: false,
+    responsive_web_grok_analyze_post_followups_enabled: true,
+    responsive_web_jetfuel_frame: true,
+    post_ctas_fetch_enabled: true,
+    responsive_web_grok_share_attachment_enabled: true,
+    responsive_web_grok_annotations_enabled: false,
+    articles_preview_enabled: true,
+    responsive_web_edit_tweet_api_enabled: true,
+    graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+    view_counts_everywhere_api_enabled: true,
+    longform_notetweets_consumption_enabled: true,
+    responsive_web_twitter_article_tweet_consumption_enabled: true,
+    tweet_awards_web_tipping_enabled: false,
+    responsive_web_grok_show_grok_translated_post: true,
+    responsive_web_grok_analysis_button_from_backend: true,
+    creator_subscriptions_quote_tweet_preview_enabled: false,
+    freedom_of_speech_not_reach_fetch_enabled: true,
+    standardized_nudges_misinfo: true,
+    tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+    longform_notetweets_rich_text_read_enabled: true,
+    longform_notetweets_inline_media_enabled: true,
+    responsive_web_grok_image_annotation_enabled: true,
+    responsive_web_grok_imagine_annotation_enabled: true,
+    responsive_web_grok_community_note_auto_translation_is_enabled: false,
+    responsive_web_enhance_cards_enabled: false
+  });
+}
+function buildFollowingFeatures() {
+  return applyFeatureOverrides("following", {
+    rweb_video_screen_enabled: true,
+    profile_label_improvements_pcf_label_in_post_enabled: false,
+    responsive_web_profile_redirect_enabled: true,
+    rweb_tipjar_consumption_enabled: true,
+    verified_phone_label_enabled: false,
+    creator_subscriptions_tweet_preview_api_enabled: true,
+    responsive_web_graphql_timeline_navigation_enabled: true,
+    responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+    premium_content_api_read_enabled: true,
+    communities_web_enable_tweet_community_results_fetch: true,
+    c9s_tweet_anatomy_moderator_badge_enabled: true,
+    responsive_web_grok_analyze_button_fetch_trends_enabled: false,
+    responsive_web_grok_analyze_post_followups_enabled: false,
+    responsive_web_grok_annotations_enabled: false,
+    responsive_web_jetfuel_frame: false,
+    post_ctas_fetch_enabled: true,
+    responsive_web_grok_share_attachment_enabled: false,
+    articles_preview_enabled: true,
+    responsive_web_edit_tweet_api_enabled: true,
+    graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+    view_counts_everywhere_api_enabled: true,
+    longform_notetweets_consumption_enabled: true,
+    responsive_web_twitter_article_tweet_consumption_enabled: true,
+    tweet_awards_web_tipping_enabled: true,
+    responsive_web_grok_show_grok_translated_post: false,
+    responsive_web_grok_analysis_button_from_backend: false,
+    creator_subscriptions_quote_tweet_preview_enabled: false,
+    freedom_of_speech_not_reach_fetch_enabled: true,
+    standardized_nudges_misinfo: true,
+    tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+    longform_notetweets_rich_text_read_enabled: true,
+    longform_notetweets_inline_media_enabled: true,
+    responsive_web_grok_image_annotation_enabled: false,
+    responsive_web_grok_imagine_annotation_enabled: false,
+    responsive_web_grok_community_note_auto_translation_is_enabled: false,
+    responsive_web_enhance_cards_enabled: false
+  });
+}
+function buildExploreFeatures() {
+  return applyFeatureOverrides("explore", {
+    rweb_video_screen_enabled: true,
+    profile_label_improvements_pcf_label_in_post_enabled: true,
+    responsive_web_profile_redirect_enabled: true,
+    rweb_tipjar_consumption_enabled: true,
+    verified_phone_label_enabled: false,
+    creator_subscriptions_tweet_preview_api_enabled: true,
+    responsive_web_graphql_timeline_navigation_enabled: true,
+    responsive_web_graphql_exclude_directive_enabled: true,
+    responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+    premium_content_api_read_enabled: false,
+    communities_web_enable_tweet_community_results_fetch: true,
+    c9s_tweet_anatomy_moderator_badge_enabled: true,
+    responsive_web_grok_analyze_button_fetch_trends_enabled: true,
+    responsive_web_grok_analyze_post_followups_enabled: true,
+    responsive_web_grok_annotations_enabled: true,
+    responsive_web_jetfuel_frame: true,
+    responsive_web_grok_share_attachment_enabled: true,
+    articles_preview_enabled: true,
+    responsive_web_edit_tweet_api_enabled: true,
+    graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+    view_counts_everywhere_api_enabled: true,
+    longform_notetweets_consumption_enabled: true,
+    responsive_web_twitter_article_tweet_consumption_enabled: true,
+    tweet_awards_web_tipping_enabled: false,
+    responsive_web_grok_show_grok_translated_post: true,
+    responsive_web_grok_analysis_button_from_backend: true,
+    creator_subscriptions_quote_tweet_preview_enabled: false,
+    freedom_of_speech_not_reach_fetch_enabled: true,
+    standardized_nudges_misinfo: true,
+    tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+    longform_notetweets_rich_text_read_enabled: true,
+    longform_notetweets_inline_media_enabled: true,
+    responsive_web_grok_image_annotation_enabled: true,
+    responsive_web_grok_imagine_annotation_enabled: true,
+    responsive_web_grok_community_note_auto_translation_is_enabled: true,
+    responsive_web_enhance_cards_enabled: false,
+    // Additional features required for ExploreSidebar
+    post_ctas_fetch_enabled: true,
+    rweb_video_timestamps_enabled: true
+  });
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-home.js
+var QUERY_UNSPECIFIED_REGEX = /query:\s*unspecified/i;
+function isQueryIdMismatch(errors) {
+  return errors.some((error2) => QUERY_UNSPECIFIED_REGEX.test(error2.message ?? ""));
+}
+function withHome(Base) {
+  class TwitterClientHome extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    async getHomeTimelineQueryIds() {
+      const primary = await this.getQueryId("HomeTimeline");
+      return Array.from(/* @__PURE__ */ new Set([primary, "edseUwk9sP5Phz__9TIRnA"]));
+    }
+    async getHomeLatestTimelineQueryIds() {
+      const primary = await this.getQueryId("HomeLatestTimeline");
+      return Array.from(/* @__PURE__ */ new Set([primary, "iOEZpOdfekFsxSlPQCQtPg"]));
+    }
+    /**
+     * Get the authenticated user's "For You" home timeline
+     */
+    async getHomeTimeline(count = 20, options = {}) {
+      return this.fetchHomeTimeline("HomeTimeline", count, options);
+    }
+    /**
+     * Get the authenticated user's "Following" (latest/chronological) home timeline
+     */
+    async getHomeLatestTimeline(count = 20, options = {}) {
+      return this.fetchHomeTimeline("HomeLatestTimeline", count, options);
+    }
+    async fetchHomeTimeline(operation, count, options) {
+      const { includeRaw = false } = options;
+      const features = buildHomeTimelineFeatures();
+      const pageSize = 20;
+      const seen = /* @__PURE__ */ new Set();
+      const tweets = [];
+      let cursor;
+      const fetchPage = async (pageCount, pageCursor) => {
+        let lastError;
+        let had404 = false;
+        const queryIds = operation === "HomeTimeline" ? await this.getHomeTimelineQueryIds() : await this.getHomeLatestTimelineQueryIds();
+        for (const queryId of queryIds) {
+          const variables = {
+            count: pageCount,
+            includePromotedContent: true,
+            latestControlAvailable: true,
+            requestContext: "launch",
+            withCommunity: true,
+            ...pageCursor ? { cursor: pageCursor } : {}
+          };
+          const params = new URLSearchParams({
+            variables: JSON.stringify(variables),
+            features: JSON.stringify(features)
+          });
+          const url2 = `${TWITTER_API_BASE}/${queryId}/${operation}?${params.toString()}`;
+          try {
+            const response = await this.fetchWithTimeout(url2, {
+              method: "GET",
+              headers: this.getHeaders()
+            });
+            if (response.status === 404) {
+              had404 = true;
+              lastError = `HTTP ${response.status}`;
+              continue;
+            }
+            if (!response.ok) {
+              const text = await response.text();
+              return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}`, had404 };
+            }
+            const data = await response.json();
+            if (data.errors && data.errors.length > 0) {
+              const errorMessage = data.errors.map((e) => e.message).join(", ");
+              return {
+                success: false,
+                error: errorMessage,
+                had404: had404 || isQueryIdMismatch(data.errors)
+              };
+            }
+            const instructions = data.data?.home?.home_timeline_urt?.instructions;
+            const pageTweets = parseTweetsFromInstructions(instructions, { quoteDepth: this.quoteDepth, includeRaw });
+            const nextCursor = extractCursorFromInstructions(instructions);
+            return { success: true, tweets: pageTweets, cursor: nextCursor, had404 };
+          } catch (error2) {
+            lastError = error2 instanceof Error ? error2.message : String(error2);
+          }
+        }
+        return { success: false, error: lastError ?? "Unknown error fetching home timeline", had404 };
+      };
+      const fetchWithRefresh = async (pageCount, pageCursor) => {
+        const firstAttempt = await fetchPage(pageCount, pageCursor);
+        if (firstAttempt.success) {
+          return firstAttempt;
+        }
+        if (firstAttempt.had404) {
+          await this.refreshQueryIds();
+          const secondAttempt = await fetchPage(pageCount, pageCursor);
+          if (secondAttempt.success) {
+            return secondAttempt;
+          }
+          return { success: false, error: secondAttempt.error };
+        }
+        return { success: false, error: firstAttempt.error };
+      };
+      while (tweets.length < count) {
+        const pageCount = Math.min(pageSize, count - tweets.length);
+        const page = await fetchWithRefresh(pageCount, cursor);
+        if (!page.success) {
+          return { success: false, error: page.error };
+        }
+        let added = 0;
+        for (const tweet of page.tweets) {
+          if (seen.has(tweet.id)) {
+            continue;
+          }
+          seen.add(tweet.id);
+          tweets.push(tweet);
+          added += 1;
+          if (tweets.length >= count) {
+            break;
+          }
+        }
+        if (!page.cursor || page.cursor === cursor || page.tweets.length === 0 || added === 0) {
+          break;
+        }
+        cursor = page.cursor;
+      }
+      return { success: true, tweets };
+    }
+  }
+  return TwitterClientHome;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-lists.js
+function parseList(listResult) {
+  if (!listResult.id_str || !listResult.name) {
+    return null;
+  }
+  const owner = listResult.user_results?.result;
+  return {
+    id: listResult.id_str,
+    name: listResult.name,
+    description: listResult.description,
+    memberCount: listResult.member_count,
+    subscriberCount: listResult.subscriber_count,
+    isPrivate: listResult.mode?.toLowerCase() === "private",
+    createdAt: listResult.created_at,
+    owner: owner ? {
+      id: owner.rest_id ?? "",
+      username: owner.legacy?.screen_name ?? "",
+      name: owner.legacy?.name ?? ""
+    } : void 0
+  };
+}
+function parseListsFromInstructions(instructions) {
+  const lists = [];
+  if (!instructions) {
+    return lists;
+  }
+  for (const instruction of instructions) {
+    if (!instruction.entries) {
+      continue;
+    }
+    for (const entry of instruction.entries) {
+      const listResult = entry.content?.itemContent?.list;
+      if (listResult) {
+        const parsed = parseList(listResult);
+        if (parsed) {
+          lists.push(parsed);
+        }
+      }
+    }
+  }
+  return lists;
+}
+function withLists(Base) {
+  class TwitterClientLists extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    async getListOwnershipsQueryIds() {
+      const primary = await this.getQueryId("ListOwnerships");
+      return Array.from(/* @__PURE__ */ new Set([primary, "wQcOSjSQ8NtgxIwvYl1lMg"]));
+    }
+    async getListMembershipsQueryIds() {
+      const primary = await this.getQueryId("ListMemberships");
+      return Array.from(/* @__PURE__ */ new Set([primary, "BlEXXdARdSeL_0KyKHHvvg"]));
+    }
+    async getListTimelineQueryIds() {
+      const primary = await this.getQueryId("ListLatestTweetsTimeline");
+      return Array.from(/* @__PURE__ */ new Set([primary, "2TemLyqrMpTeAmysdbnVqw"]));
+    }
+    /**
+     * Get lists owned by the authenticated user
+     */
+    async getOwnedLists(count = 100) {
+      const userResult = await this.getCurrentUser();
+      if (!userResult.success || !userResult.user) {
+        return { success: false, error: userResult.error ?? "Could not determine current user" };
+      }
+      const variables = {
+        userId: userResult.user.id,
+        count,
+        isListMembershipShown: true,
+        isListMemberTargetUserId: userResult.user.id
+      };
+      const features = buildListsFeatures();
+      const params = new URLSearchParams({
+        variables: JSON.stringify(variables),
+        features: JSON.stringify(features)
+      });
+      const tryOnce = async () => {
+        let lastError;
+        let had404 = false;
+        const queryIds = await this.getListOwnershipsQueryIds();
+        for (const queryId of queryIds) {
+          const url2 = `${TWITTER_API_BASE}/${queryId}/ListOwnerships?${params.toString()}`;
+          try {
+            const response = await this.fetchWithTimeout(url2, {
+              method: "GET",
+              headers: this.getHeaders()
+            });
+            if (response.status === 404) {
+              had404 = true;
+              lastError = `HTTP ${response.status}`;
+              continue;
+            }
+            if (!response.ok) {
+              const text = await response.text();
+              return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}`, had404 };
+            }
+            const data = await response.json();
+            if (data.errors && data.errors.length > 0) {
+              return { success: false, error: data.errors.map((e) => e.message).join(", "), had404 };
+            }
+            const instructions = data.data?.user?.result?.timeline?.timeline?.instructions;
+            const lists = parseListsFromInstructions(instructions);
+            return { success: true, lists, had404 };
+          } catch (error2) {
+            lastError = error2 instanceof Error ? error2.message : String(error2);
+          }
+        }
+        return { success: false, error: lastError ?? "Unknown error fetching owned lists", had404 };
+      };
+      const firstAttempt = await tryOnce();
+      if (firstAttempt.success) {
+        return { success: true, lists: firstAttempt.lists };
+      }
+      if (firstAttempt.had404) {
+        await this.refreshQueryIds();
+        const secondAttempt = await tryOnce();
+        if (secondAttempt.success) {
+          return { success: true, lists: secondAttempt.lists };
+        }
+        return { success: false, error: secondAttempt.error };
+      }
+      return { success: false, error: firstAttempt.error };
+    }
+    /**
+     * Get lists the authenticated user is a member of
+     */
+    async getListMemberships(count = 100) {
+      const userResult = await this.getCurrentUser();
+      if (!userResult.success || !userResult.user) {
+        return { success: false, error: userResult.error ?? "Could not determine current user" };
+      }
+      const variables = {
+        userId: userResult.user.id,
+        count,
+        isListMembershipShown: true,
+        isListMemberTargetUserId: userResult.user.id
+      };
+      const features = buildListsFeatures();
+      const params = new URLSearchParams({
+        variables: JSON.stringify(variables),
+        features: JSON.stringify(features)
+      });
+      const tryOnce = async () => {
+        let lastError;
+        let had404 = false;
+        const queryIds = await this.getListMembershipsQueryIds();
+        for (const queryId of queryIds) {
+          const url2 = `${TWITTER_API_BASE}/${queryId}/ListMemberships?${params.toString()}`;
+          try {
+            const response = await this.fetchWithTimeout(url2, {
+              method: "GET",
+              headers: this.getHeaders()
+            });
+            if (response.status === 404) {
+              had404 = true;
+              lastError = `HTTP ${response.status}`;
+              continue;
+            }
+            if (!response.ok) {
+              const text = await response.text();
+              return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}`, had404 };
+            }
+            const data = await response.json();
+            if (data.errors && data.errors.length > 0) {
+              return { success: false, error: data.errors.map((e) => e.message).join(", "), had404 };
+            }
+            const instructions = data.data?.user?.result?.timeline?.timeline?.instructions;
+            const lists = parseListsFromInstructions(instructions);
+            return { success: true, lists, had404 };
+          } catch (error2) {
+            lastError = error2 instanceof Error ? error2.message : String(error2);
+          }
+        }
+        return { success: false, error: lastError ?? "Unknown error fetching list memberships", had404 };
+      };
+      const firstAttempt = await tryOnce();
+      if (firstAttempt.success) {
+        return { success: true, lists: firstAttempt.lists };
+      }
+      if (firstAttempt.had404) {
+        await this.refreshQueryIds();
+        const secondAttempt = await tryOnce();
+        if (secondAttempt.success) {
+          return { success: true, lists: secondAttempt.lists };
+        }
+        return { success: false, error: secondAttempt.error };
+      }
+      return { success: false, error: firstAttempt.error };
+    }
+    /**
+     * Get tweets from a list timeline
+     */
+    async getListTimeline(listId, count = 20, options = {}) {
+      return this.getListTimelinePaged(listId, count, options);
+    }
+    /**
+     * Get all tweets from a list timeline (paginated)
+     */
+    async getAllListTimeline(listId, options) {
+      return this.getListTimelinePaged(listId, Number.POSITIVE_INFINITY, options);
+    }
+    /**
+     * Internal paginated list timeline fetcher
+     */
+    async getListTimelinePaged(listId, limit, options = {}) {
+      const features = buildListsFeatures();
+      const pageSize = 20;
+      const seen = /* @__PURE__ */ new Set();
+      const tweets = [];
+      let cursor = options.cursor;
+      let nextCursor;
+      let pagesFetched = 0;
+      const { includeRaw = false, maxPages } = options;
+      const fetchPage = async (pageCount, pageCursor) => {
+        let lastError;
+        let had404 = false;
+        const queryIds = await this.getListTimelineQueryIds();
+        const variables = {
+          listId,
+          count: pageCount,
+          ...pageCursor ? { cursor: pageCursor } : {}
+        };
+        const params = new URLSearchParams({
+          variables: JSON.stringify(variables),
+          features: JSON.stringify(features)
+        });
+        for (const queryId of queryIds) {
+          const url2 = `${TWITTER_API_BASE}/${queryId}/ListLatestTweetsTimeline?${params.toString()}`;
+          try {
+            const response = await this.fetchWithTimeout(url2, {
+              method: "GET",
+              headers: this.getHeaders()
+            });
+            if (response.status === 404) {
+              had404 = true;
+              lastError = `HTTP ${response.status}`;
+              continue;
+            }
+            if (!response.ok) {
+              const text = await response.text();
+              return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}`, had404 };
+            }
+            const data = await response.json();
+            if (data.errors && data.errors.length > 0) {
+              return { success: false, error: data.errors.map((e) => e.message).join(", "), had404 };
+            }
+            const instructions = data.data?.list?.tweets_timeline?.timeline?.instructions;
+            const pageTweets = parseTweetsFromInstructions(instructions, { quoteDepth: this.quoteDepth, includeRaw });
+            const nextCursor2 = extractCursorFromInstructions(instructions);
+            return { success: true, tweets: pageTweets, cursor: nextCursor2, had404 };
+          } catch (error2) {
+            lastError = error2 instanceof Error ? error2.message : String(error2);
+          }
+        }
+        return { success: false, error: lastError ?? "Unknown error fetching list timeline", had404 };
+      };
+      const fetchWithRefresh = async (pageCount, pageCursor) => {
+        const firstAttempt = await fetchPage(pageCount, pageCursor);
+        if (firstAttempt.success) {
+          return firstAttempt;
+        }
+        if (firstAttempt.had404) {
+          await this.refreshQueryIds();
+          const secondAttempt = await fetchPage(pageCount, pageCursor);
+          if (secondAttempt.success) {
+            return secondAttempt;
+          }
+          return { success: false, error: secondAttempt.error };
+        }
+        return { success: false, error: firstAttempt.error };
+      };
+      const unlimited = limit === Number.POSITIVE_INFINITY;
+      while (unlimited || tweets.length < limit) {
+        const pageCount = unlimited ? pageSize : Math.min(pageSize, limit - tweets.length);
+        const page = await fetchWithRefresh(pageCount, cursor);
+        if (!page.success) {
+          return { success: false, error: page.error };
+        }
+        pagesFetched += 1;
+        let added = 0;
+        for (const tweet of page.tweets) {
+          if (seen.has(tweet.id)) {
+            continue;
+          }
+          seen.add(tweet.id);
+          tweets.push(tweet);
+          added += 1;
+          if (!unlimited && tweets.length >= limit) {
+            break;
+          }
+        }
+        const pageCursor = page.cursor;
+        if (!pageCursor || pageCursor === cursor || page.tweets.length === 0 || added === 0) {
+          nextCursor = void 0;
+          break;
+        }
+        if (maxPages && pagesFetched >= maxPages) {
+          nextCursor = pageCursor;
+          break;
+        }
+        cursor = pageCursor;
+        nextCursor = pageCursor;
+      }
+      return { success: true, tweets, nextCursor };
+    }
+  }
+  return TwitterClientLists;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-media.js
+function withMedia(Base) {
+  class TwitterClientMedia extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    mediaCategoryForMime(mimeType) {
+      if (mimeType.startsWith("image/")) {
+        if (mimeType === "image/gif") {
+          return "tweet_gif";
+        }
+        return "tweet_image";
+      }
+      if (mimeType.startsWith("video/")) {
+        return "tweet_video";
+      }
+      return null;
+    }
+    async uploadMedia(input) {
+      const category = this.mediaCategoryForMime(input.mimeType);
+      if (!category) {
+        return { success: false, error: `Unsupported media type: ${input.mimeType}` };
+      }
+      try {
+        const initParams = new URLSearchParams({
+          command: "INIT",
+          total_bytes: String(input.data.byteLength),
+          media_type: input.mimeType,
+          media_category: category
+        });
+        const initResp = await this.fetchWithTimeout(TWITTER_UPLOAD_URL, {
+          method: "POST",
+          headers: this.getUploadHeaders(),
+          body: initParams
+        });
+        if (!initResp.ok) {
+          const text = await initResp.text();
+          return { success: false, error: `HTTP ${initResp.status}: ${text.slice(0, 200)}` };
+        }
+        const initBody = await initResp.json();
+        const mediaId = typeof initBody.media_id_string === "string" ? initBody.media_id_string : initBody.media_id !== void 0 ? String(initBody.media_id) : void 0;
+        if (!mediaId) {
+          return { success: false, error: "Media upload INIT did not return media_id" };
+        }
+        const chunkSize = 5 * 1024 * 1024;
+        let segmentIndex = 0;
+        for (let offset = 0; offset < input.data.byteLength; offset += chunkSize) {
+          const chunk = input.data.slice(offset, Math.min(input.data.byteLength, offset + chunkSize));
+          const form = new FormData();
+          form.set("command", "APPEND");
+          form.set("media_id", mediaId);
+          form.set("segment_index", String(segmentIndex));
+          form.set("media", new Blob([chunk], { type: input.mimeType }), "media");
+          const appendResp = await this.fetchWithTimeout(TWITTER_UPLOAD_URL, {
+            method: "POST",
+            headers: this.getUploadHeaders(),
+            body: form
+          });
+          if (!appendResp.ok) {
+            const text = await appendResp.text();
+            return { success: false, error: `HTTP ${appendResp.status}: ${text.slice(0, 200)}` };
+          }
+          segmentIndex += 1;
+        }
+        const finalizeParams = new URLSearchParams({ command: "FINALIZE", media_id: mediaId });
+        const finalizeResp = await this.fetchWithTimeout(TWITTER_UPLOAD_URL, {
+          method: "POST",
+          headers: this.getUploadHeaders(),
+          body: finalizeParams
+        });
+        if (!finalizeResp.ok) {
+          const text = await finalizeResp.text();
+          return { success: false, error: `HTTP ${finalizeResp.status}: ${text.slice(0, 200)}` };
+        }
+        const finalizeBody = await finalizeResp.json();
+        const info = finalizeBody.processing_info;
+        if (info?.state && info.state !== "succeeded") {
+          let attempts = 0;
+          while (attempts < 20) {
+            if (info.state === "failed") {
+              const msg = info.error?.message || info.error?.name || "Media processing failed";
+              return { success: false, error: msg };
+            }
+            const delaySecs = Number.isFinite(info.check_after_secs) ? Math.max(1, info.check_after_secs) : 2;
+            await this.sleep(delaySecs * 1e3);
+            const statusUrl = `${TWITTER_UPLOAD_URL}?${new URLSearchParams({
+              command: "STATUS",
+              media_id: mediaId
+            }).toString()}`;
+            const statusResp = await this.fetchWithTimeout(statusUrl, {
+              method: "GET",
+              headers: this.getUploadHeaders()
+            });
+            if (!statusResp.ok) {
+              const text = await statusResp.text();
+              return { success: false, error: `HTTP ${statusResp.status}: ${text.slice(0, 200)}` };
+            }
+            const statusBody = await statusResp.json();
+            if (!statusBody.processing_info) {
+              break;
+            }
+            info.state = statusBody.processing_info.state;
+            info.check_after_secs = statusBody.processing_info.check_after_secs;
+            info.error = statusBody.processing_info.error;
+            if (info.state === "succeeded") {
+              break;
+            }
+            attempts += 1;
+          }
+        }
+        if (input.alt && input.mimeType.startsWith("image/")) {
+          const metaResp = await this.fetchWithTimeout(TWITTER_MEDIA_METADATA_URL, {
+            method: "POST",
+            headers: this.getJsonHeaders(),
+            body: JSON.stringify({ media_id: mediaId, alt_text: { text: input.alt } })
+          });
+          if (!metaResp.ok) {
+            const text = await metaResp.text();
+            return { success: false, error: `HTTP ${metaResp.status}: ${text.slice(0, 200)}` };
+          }
+        }
+        return { success: true, mediaId };
+      } catch (error2) {
+        return { success: false, error: error2 instanceof Error ? error2.message : String(error2) };
+      }
+    }
+  }
+  return TwitterClientMedia;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-news.js
+var POST_COUNT_REGEX = /[\d.]+[KMB]?\s*posts?/i;
+var POST_COUNT_MATCH_REGEX = /([\d.]+)([KMB]?)\s*posts?/i;
+var TIMELINE_IDS = {
+  forYou: "VGltZWxpbmU6DAC2CwABAAAAB2Zvcl95b3UAAA==",
+  trending: "VGltZWxpbmU6DAC2CwABAAAACHRyZW5kaW5nAAA=",
+  news: "VGltZWxpbmU6DAC2CwABAAAABG5ld3MAAA==",
+  sports: "VGltZWxpbmU6DAC2CwABAAAABnNwb3J0cwAA",
+  entertainment: "VGltZWxpbmU6DAC2CwABAAAADWVudGVydGFpbm1lbnQAAA=="
+};
+function withNews(Base) {
+  class TwitterClientNews extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    /**
+     * Fetch news and trending topics from Twitter's Explore page tabs
+     */
+    async getNews(count = 10, options = {}) {
+      const { includeRaw = false, withTweets = false, tweetsPerItem = 5, aiOnly = false, tabs = ["forYou", "news", "sports", "entertainment"] } = options;
+      const debug = process.env.BIRD_DEBUG === "1";
+      if (debug) {
+        console.error(`[getNews] Fetching from tabs: ${tabs.join(", ")}`);
+      }
+      const allItems = [];
+      const seenHeadlines = /* @__PURE__ */ new Set();
+      for (const tab of tabs) {
+        const timelineId = TIMELINE_IDS[tab];
+        if (!timelineId) {
+          continue;
+        }
+        try {
+          const tabItems = await this.fetchTimelineTab(tab, timelineId, count, aiOnly, includeRaw);
+          for (const item of tabItems) {
+            if (!seenHeadlines.has(item.headline)) {
+              seenHeadlines.add(item.headline);
+              allItems.push(item);
+            }
+          }
+          if (debug) {
+            console.error(`[getNews] Tab ${tab}: found ${tabItems.length} items, total unique: ${allItems.length}`);
+          }
+          if (allItems.length >= count) {
+            break;
+          }
+        } catch (error2) {
+          if (debug) {
+            console.error(`[getNews] Error fetching tab ${tab}:`, error2);
+          }
+        }
+      }
+      if (allItems.length === 0) {
+        return { success: false, error: "No news items found" };
+      }
+      const items = allItems.slice(0, count);
+      if (withTweets) {
+        await this.enrichWithTweets(items, tweetsPerItem, includeRaw);
+      }
+      return { success: true, items };
+    }
+    /**
+     * Fetch a specific timeline tab using GenericTimelineById
+     */
+    async fetchTimelineTab(tabName, timelineId, maxCount, aiOnly, includeRaw) {
+      const queryId = await this.getQueryId("GenericTimelineById");
+      const features = buildExploreFeatures();
+      const variables = {
+        timelineId,
+        count: maxCount * 2,
+        // Fetch more to account for filtering
+        includePromotedContent: false
+      };
+      const params = new URLSearchParams({
+        variables: JSON.stringify(variables),
+        features: JSON.stringify(features)
+      });
+      const url2 = `${TWITTER_API_BASE}/${queryId}/GenericTimelineById?${params.toString()}`;
+      const response = await this.fetchWithTimeout(url2, {
+        method: "GET",
+        headers: this.getHeaders()
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`HTTP ${response.status}: ${text.slice(0, 200)}`);
+      }
+      const data = await response.json();
+      if (process.env.BIRD_DEBUG_JSON) {
+        const fs2 = await import("node:fs/promises");
+        const debugPath = process.env.BIRD_DEBUG_JSON.replace(".json", `-${tabName}.json`);
+        await fs2.writeFile(debugPath, JSON.stringify(data, null, 2)).catch(() => {
+        });
+      }
+      if (data.errors && data.errors.length > 0) {
+        throw new Error(data.errors.map((e) => e.message).join("; "));
+      }
+      return this.parseTimelineTabItems(data, tabName, maxCount, aiOnly, includeRaw);
+    }
+    /**
+     * Parse items from a GenericTimelineById response
+     */
+    parseTimelineTabItems(data, source, maxCount, aiOnly, includeRaw) {
+      const items = [];
+      const seenHeadlines = /* @__PURE__ */ new Set();
+      const timeline = data?.data?.timeline?.timeline;
+      if (!timeline) {
+        return [];
+      }
+      const instructions = timeline.instructions || [];
+      for (const instruction of instructions) {
+        const entries = instruction.entries ?? (instruction.entry ? [instruction.entry] : []);
+        if (!entries || entries.length === 0) {
+          continue;
+        }
+        for (const entry of entries) {
+          if (items.length >= maxCount) {
+            break;
+          }
+          const content = entry.content;
+          if (!content) {
+            continue;
+          }
+          if (content.itemContent) {
+            const newsItem = this.parseNewsItemFromContent(content.itemContent, entry.entryId, source, seenHeadlines, aiOnly, includeRaw);
+            if (newsItem) {
+              items.push(newsItem);
+            }
+          }
+          const itemsArray = content?.items || [];
+          for (const data2 of itemsArray) {
+            if (items.length >= maxCount) {
+              break;
+            }
+            const itemContent = data2?.itemContent || data2?.item?.itemContent;
+            if (!itemContent) {
+              continue;
+            }
+            const newsItem = this.parseNewsItemFromContent(itemContent, entry.entryId, source, seenHeadlines, aiOnly, includeRaw);
+            if (newsItem) {
+              items.push(newsItem);
+            }
+          }
+        }
+      }
+      return items;
+    }
+    parseNewsItemFromContent(itemContent, entryId, source, seenHeadlines, aiOnly, includeRaw) {
+      const headline = itemContent.name || itemContent.title;
+      if (!headline) {
+        return null;
+      }
+      const trendMetadata = itemContent?.trend_metadata;
+      const trendUrl = itemContent.trend_url?.url || trendMetadata?.url?.url;
+      const socialContext = itemContent?.social_context?.text || "";
+      const hasNewsCategory = socialContext.includes("News") || socialContext.includes("hours ago");
+      const isFullSentence = headline.split(" ").length >= 5;
+      const isExplicitlyAiTrend = itemContent.is_ai_trend === true;
+      const isAiNews = isExplicitlyAiTrend || isFullSentence && hasNewsCategory;
+      if (aiOnly && !isAiNews) {
+        return null;
+      }
+      if (seenHeadlines.has(headline)) {
+        return null;
+      }
+      seenHeadlines.add(headline);
+      let postCount;
+      let timeAgo;
+      let category = "Trending";
+      const socialCtx = itemContent?.social_context;
+      if (socialCtx?.text) {
+        const socialContextText = socialCtx.text;
+        const parts = socialContextText.split("\xB7").map((s) => s.trim());
+        for (const part of parts) {
+          if (part.includes("ago")) {
+            timeAgo = part;
+          } else if (part.match(POST_COUNT_REGEX)) {
+            const match = part.match(POST_COUNT_MATCH_REGEX);
+            if (match) {
+              let num = Number.parseFloat(match[1]);
+              const suffix = match[2]?.toUpperCase();
+              if (suffix === "K") {
+                num *= 1e3;
+              } else if (suffix === "M") {
+                num *= 1e6;
+              } else if (suffix === "B") {
+                num *= 1e9;
+              }
+              postCount = Math.round(num);
+            }
+          } else {
+            category = part;
+          }
+        }
+      }
+      if (trendMetadata?.meta_description) {
+        const metaDesc = trendMetadata.meta_description;
+        const postMatch = metaDesc.match(POST_COUNT_MATCH_REGEX);
+        if (postMatch) {
+          let num = Number.parseFloat(postMatch[1]);
+          const suffix = postMatch[2]?.toUpperCase();
+          if (suffix === "K") {
+            num *= 1e3;
+          } else if (suffix === "M") {
+            num *= 1e6;
+          } else if (suffix === "B") {
+            num *= 1e9;
+          }
+          postCount = Math.round(num);
+        }
+      }
+      if (trendMetadata?.domain_context && (category === "Trending" || category === "News")) {
+        category = trendMetadata.domain_context;
+      }
+      const item = {
+        id: trendUrl ?? (entryId ? `${entryId}-${headline}` : `${source}-${headline}`),
+        headline,
+        category: isAiNews ? `AI \xB7 ${category}` : category,
+        timeAgo,
+        postCount,
+        description: itemContent.description,
+        url: trendUrl
+      };
+      if (includeRaw) {
+        item._raw = itemContent;
+      }
+      return item;
+    }
+    async enrichWithTweets(items, tweetsPerItem, includeRaw) {
+      const debug = process.env.BIRD_DEBUG === "1";
+      for (const item of items) {
+        try {
+          const searchQuery = item.headline;
+          if (!searchQuery) {
+            continue;
+          }
+          if ("search" in this && typeof this.search === "function") {
+            const result = await this.search(searchQuery, tweetsPerItem, { includeRaw });
+            if (result.success && result.tweets) {
+              item.tweets = result.tweets;
+            }
+          }
+        } catch {
+          if (debug) {
+            console.error("[getNews] Failed to enrich item with tweets:", item.headline);
+          }
+        }
+      }
+    }
+  }
+  return TwitterClientNews;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-posting.js
+function withPosting(Base) {
+  class TwitterClientPosting extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    /**
+     * Post a new tweet
+     */
+    async tweet(text, mediaIds) {
+      const variables = {
+        tweet_text: text,
+        dark_request: false,
+        media: {
+          media_entities: (mediaIds ?? []).map((id) => ({ media_id: id, tagged_users: [] })),
+          possibly_sensitive: false
+        },
+        semantic_annotation_ids: []
+      };
+      const features = buildTweetCreateFeatures();
+      return this.createTweet(variables, features);
+    }
+    /**
+     * Reply to an existing tweet
+     */
+    async reply(text, replyToTweetId, mediaIds) {
+      const variables = {
+        tweet_text: text,
+        reply: {
+          in_reply_to_tweet_id: replyToTweetId,
+          exclude_reply_user_ids: []
+        },
+        dark_request: false,
+        media: {
+          media_entities: (mediaIds ?? []).map((id) => ({ media_id: id, tagged_users: [] })),
+          possibly_sensitive: false
+        },
+        semantic_annotation_ids: []
+      };
+      const features = buildTweetCreateFeatures();
+      return this.createTweet(variables, features);
+    }
+    async createTweet(variables, features) {
+      await this.ensureClientUserId();
+      let queryId = await this.getQueryId("CreateTweet");
+      let urlWithOperation = `${TWITTER_API_BASE}/${queryId}/CreateTweet`;
+      const buildBody = () => JSON.stringify({ variables, features, queryId });
+      let body = buildBody();
+      try {
+        const headers = { ...this.getHeaders(), referer: "https://x.com/compose/post" };
+        let response = await this.fetchWithTimeout(urlWithOperation, {
+          method: "POST",
+          headers,
+          body
+        });
+        if (response.status === 404) {
+          await this.refreshQueryIds();
+          queryId = await this.getQueryId("CreateTweet");
+          urlWithOperation = `${TWITTER_API_BASE}/${queryId}/CreateTweet`;
+          body = buildBody();
+          response = await this.fetchWithTimeout(urlWithOperation, {
+            method: "POST",
+            headers: { ...this.getHeaders(), referer: "https://x.com/compose/post" },
+            body
+          });
+          if (response.status === 404) {
+            const retry = await this.fetchWithTimeout(TWITTER_GRAPHQL_POST_URL, {
+              method: "POST",
+              headers: { ...this.getHeaders(), referer: "https://x.com/compose/post" },
+              body
+            });
+            if (!retry.ok) {
+              const text = await retry.text();
+              return { success: false, error: `HTTP ${retry.status}: ${text.slice(0, 200)}` };
+            }
+            const data2 = await retry.json();
+            if (data2.errors && data2.errors.length > 0) {
+              const fallback = await this.tryStatusUpdateFallback(data2.errors, variables);
+              if (fallback) {
+                return fallback;
+              }
+              return { success: false, error: this.formatErrors(data2.errors) };
+            }
+            const tweetId2 = data2.data?.create_tweet?.tweet_results?.result?.rest_id;
+            if (tweetId2) {
+              return { success: true, tweetId: tweetId2 };
+            }
+            return { success: false, error: "Tweet created but no ID returned" };
+          }
+        }
+        if (!response.ok) {
+          const text = await response.text();
+          return {
+            success: false,
+            error: `HTTP ${response.status}: ${text.slice(0, 200)}`
+          };
+        }
+        const data = await response.json();
+        if (data.errors && data.errors.length > 0) {
+          const fallback = await this.tryStatusUpdateFallback(data.errors, variables);
+          if (fallback) {
+            return fallback;
+          }
+          return {
+            success: false,
+            error: this.formatErrors(data.errors)
+          };
+        }
+        const tweetId = data.data?.create_tweet?.tweet_results?.result?.rest_id;
+        if (tweetId) {
+          return {
+            success: true,
+            tweetId
+          };
+        }
+        return {
+          success: false,
+          error: "Tweet created but no ID returned"
+        };
+      } catch (error2) {
+        return {
+          success: false,
+          error: error2 instanceof Error ? error2.message : String(error2)
+        };
+      }
+    }
+    formatErrors(errors) {
+      return errors.map((error2) => typeof error2.code === "number" ? `${error2.message} (${error2.code})` : error2.message).join(", ");
+    }
+    statusUpdateInputFromCreateTweetVariables(variables) {
+      const text = typeof variables.tweet_text === "string" ? variables.tweet_text : null;
+      if (!text) {
+        return null;
+      }
+      const reply = variables.reply;
+      const inReplyToTweetId = reply && typeof reply === "object" && typeof reply.in_reply_to_tweet_id === "string" ? reply.in_reply_to_tweet_id : void 0;
+      const media = variables.media;
+      const mediaEntities = media && typeof media === "object" ? media.media_entities : void 0;
+      const mediaIds = Array.isArray(mediaEntities) ? mediaEntities.map((entity) => entity && typeof entity === "object" && "media_id" in entity ? entity.media_id : void 0).filter((value) => typeof value === "string" || typeof value === "number").map((value) => String(value)) : void 0;
+      return { text, inReplyToTweetId, mediaIds: mediaIds && mediaIds.length > 0 ? mediaIds : void 0 };
+    }
+    async postStatusUpdate(input) {
+      const params = new URLSearchParams();
+      params.set("status", input.text);
+      if (input.inReplyToTweetId) {
+        params.set("in_reply_to_status_id", input.inReplyToTweetId);
+        params.set("auto_populate_reply_metadata", "true");
+      }
+      if (input.mediaIds && input.mediaIds.length > 0) {
+        params.set("media_ids", input.mediaIds.join(","));
+      }
+      try {
+        const response = await this.fetchWithTimeout(TWITTER_STATUS_UPDATE_URL, {
+          method: "POST",
+          headers: {
+            ...this.getBaseHeaders(),
+            "content-type": "application/x-www-form-urlencoded",
+            referer: "https://x.com/compose/post"
+          },
+          body: params.toString()
+        });
+        if (!response.ok) {
+          const text = await response.text();
+          return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}` };
+        }
+        const data = await response.json();
+        if (data.errors && data.errors.length > 0) {
+          return { success: false, error: this.formatErrors(data.errors) };
+        }
+        const tweetId = typeof data.id_str === "string" ? data.id_str : data.id !== void 0 ? String(data.id) : void 0;
+        if (tweetId) {
+          return { success: true, tweetId };
+        }
+        return { success: false, error: "Tweet created but no ID returned" };
+      } catch (error2) {
+        return { success: false, error: error2 instanceof Error ? error2.message : String(error2) };
+      }
+    }
+    async tryStatusUpdateFallback(errors, variables) {
+      if (!errors.some((error2) => error2.code === 226)) {
+        return null;
+      }
+      const input = this.statusUpdateInputFromCreateTweetVariables(variables);
+      if (!input) {
+        return null;
+      }
+      const fallback = await this.postStatusUpdate(input);
+      if (fallback.success) {
+        return fallback;
+      }
+      return {
+        success: false,
+        error: `${this.formatErrors(errors)} | fallback: ${fallback.error ?? "Unknown error"}`
+      };
+    }
+  }
+  return TwitterClientPosting;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-search.js
+var RAW_QUERY_MISSING_REGEX = /must be defined/i;
+function isQueryIdMismatch2(payload) {
+  try {
+    const parsed = JSON.parse(payload);
+    return parsed.errors?.some((error2) => {
+      if (error2?.extensions?.code === "GRAPHQL_VALIDATION_FAILED") {
+        return true;
+      }
+      if (error2?.path?.includes("rawQuery") && RAW_QUERY_MISSING_REGEX.test(error2.message ?? "")) {
+        return true;
+      }
+      return false;
+    }) ?? false;
+  } catch {
+    return false;
+  }
+}
+function withSearch(Base) {
+  class TwitterClientSearch extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    /**
+     * Search for tweets matching a query
+     */
+    async search(query, count = 20, options = {}) {
+      return this.searchPaged(query, count, options);
+    }
+    /**
+     * Get all search results (paged)
+     */
+    async getAllSearchResults(query, options) {
+      return this.searchPaged(query, Number.POSITIVE_INFINITY, options);
+    }
+    async searchPaged(query, limit, options = {}) {
+      const features = buildSearchFeatures();
+      const pageSize = 20;
+      const seen = /* @__PURE__ */ new Set();
+      const tweets = [];
+      let cursor = options.cursor;
+      let nextCursor;
+      let pagesFetched = 0;
+      const { includeRaw = false, maxPages } = options;
+      const fetchPage = async (pageCount, pageCursor) => {
+        let lastError;
+        let had404 = false;
+        const queryIds = await this.getSearchTimelineQueryIds();
+        for (const queryId of queryIds) {
+          const variables = {
+            rawQuery: query,
+            count: pageCount,
+            querySource: "typed_query",
+            product: "Latest",
+            ...pageCursor ? { cursor: pageCursor } : {}
+          };
+          const params = new URLSearchParams({
+            variables: JSON.stringify(variables)
+          });
+          const url2 = `${TWITTER_API_BASE}/${queryId}/SearchTimeline?${params.toString()}`;
+          try {
+            const response = await this.fetchWithTimeout(url2, {
+              method: "POST",
+              headers: this.getHeaders(),
+              body: JSON.stringify({ features, queryId })
+            });
+            if (response.status === 404) {
+              had404 = true;
+              lastError = `HTTP ${response.status}`;
+              continue;
+            }
+            if (!response.ok) {
+              const text = await response.text();
+              const shouldRefreshQueryIds = (response.status === 400 || response.status === 422) && isQueryIdMismatch2(text);
+              return {
+                success: false,
+                error: `HTTP ${response.status}: ${text.slice(0, 200)}`,
+                had404: had404 || shouldRefreshQueryIds
+              };
+            }
+            const data = await response.json();
+            if (data.errors && data.errors.length > 0) {
+              const shouldRefreshQueryIds = data.errors.some((error2) => error2?.extensions?.code === "GRAPHQL_VALIDATION_FAILED");
+              return {
+                success: false,
+                error: data.errors.map((e) => e.message).join(", "),
+                had404: had404 || shouldRefreshQueryIds
+              };
+            }
+            const instructions = data.data?.search_by_raw_query?.search_timeline?.timeline?.instructions;
+            const pageTweets = parseTweetsFromInstructions(instructions, { quoteDepth: this.quoteDepth, includeRaw });
+            const nextCursor2 = extractCursorFromInstructions(instructions);
+            return { success: true, tweets: pageTweets, cursor: nextCursor2, had404 };
+          } catch (error2) {
+            lastError = error2 instanceof Error ? error2.message : String(error2);
+          }
+        }
+        return { success: false, error: lastError ?? "Unknown error fetching search results", had404 };
+      };
+      const fetchWithRefresh = async (pageCount, pageCursor) => {
+        const firstAttempt = await fetchPage(pageCount, pageCursor);
+        if (firstAttempt.success) {
+          return firstAttempt;
+        }
+        if (firstAttempt.had404) {
+          await this.refreshQueryIds();
+          const secondAttempt = await fetchPage(pageCount, pageCursor);
+          if (secondAttempt.success) {
+            return secondAttempt;
+          }
+          return { success: false, error: secondAttempt.error };
+        }
+        return { success: false, error: firstAttempt.error };
+      };
+      const unlimited = limit === Number.POSITIVE_INFINITY;
+      while (unlimited || tweets.length < limit) {
+        const pageCount = unlimited ? pageSize : Math.min(pageSize, limit - tweets.length);
+        const page = await fetchWithRefresh(pageCount, cursor);
+        if (!page.success) {
+          return { success: false, error: page.error };
+        }
+        pagesFetched += 1;
+        let added = 0;
+        for (const tweet of page.tweets) {
+          if (seen.has(tweet.id)) {
+            continue;
+          }
+          seen.add(tweet.id);
+          tweets.push(tweet);
+          added += 1;
+          if (!unlimited && tweets.length >= limit) {
+            break;
+          }
+        }
+        const pageCursor = page.cursor;
+        if (!pageCursor || pageCursor === cursor || page.tweets.length === 0 || added === 0) {
+          nextCursor = void 0;
+          break;
+        }
+        if (maxPages && pagesFetched >= maxPages) {
+          nextCursor = pageCursor;
+          break;
+        }
+        cursor = pageCursor;
+        nextCursor = pageCursor;
+      }
+      return { success: true, tweets, nextCursor };
+    }
+  }
+  return TwitterClientSearch;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-timelines.js
+function withTimelines(Base) {
+  class TwitterClientTimelines extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    logBookmarksDebug(message, data) {
+      if (process.env.BIRD_DEBUG_BOOKMARKS !== "1") {
+        return;
+      }
+      if (data) {
+        console.error(`[bird][debug][bookmarks] ${message}`, JSON.stringify(data));
+      } else {
+        console.error(`[bird][debug][bookmarks] ${message}`);
+      }
+    }
+    async getBookmarksQueryIds() {
+      const primary = await this.getQueryId("Bookmarks");
+      return Array.from(/* @__PURE__ */ new Set([primary, "RV1g3b8n_SGOHwkqKYSCFw", "tmd4ifV8RHltzn8ymGg1aw"]));
+    }
+    async getBookmarkFolderQueryIds() {
+      const primary = await this.getQueryId("BookmarkFolderTimeline");
+      return Array.from(/* @__PURE__ */ new Set([primary, "KJIQpsvxrTfRIlbaRIySHQ"]));
+    }
+    async getLikesQueryIds() {
+      const primary = await this.getQueryId("Likes");
+      return Array.from(/* @__PURE__ */ new Set([primary, "JR2gceKucIKcVNB_9JkhsA"]));
+    }
+    /**
+     * Get the authenticated user's bookmarks
+     */
+    async getBookmarks(count = 20, options = {}) {
+      return this.getBookmarksPaged(count, options);
+    }
+    async getAllBookmarks(options) {
+      return this.getBookmarksPaged(Number.POSITIVE_INFINITY, options);
+    }
+    /**
+     * Get the authenticated user's liked tweets
+     */
+    async getLikes(count = 20, options = {}) {
+      return this.getLikesPaged(count, options);
+    }
+    async getAllLikes(options) {
+      return this.getLikesPaged(Number.POSITIVE_INFINITY, options);
+    }
+    async getLikesPaged(limit, options = {}) {
+      const userResult = await this.getCurrentUser();
+      if (!userResult.success || !userResult.user) {
+        return { success: false, error: userResult.error ?? "Could not determine current user" };
+      }
+      const userId = userResult.user.id;
+      const features = buildLikesFeatures();
+      const pageSize = 20;
+      const seen = /* @__PURE__ */ new Set();
+      const tweets = [];
+      let cursor = options.cursor;
+      let nextCursor;
+      let pagesFetched = 0;
+      const { includeRaw = false, maxPages } = options;
+      const fetchPage = async (pageCount, pageCursor) => {
+        let lastError;
+        let had404 = false;
+        const queryIds = await this.getLikesQueryIds();
+        for (const queryId of queryIds) {
+          const variables = {
+            userId,
+            count: pageCount,
+            includePromotedContent: false,
+            withClientEventToken: false,
+            withBirdwatchNotes: false,
+            withVoice: true,
+            ...pageCursor ? { cursor: pageCursor } : {}
+          };
+          const params = new URLSearchParams({
+            variables: JSON.stringify(variables),
+            features: JSON.stringify(features)
+          });
+          const url2 = `${TWITTER_API_BASE}/${queryId}/Likes?${params.toString()}`;
+          try {
+            const response = await this.fetchWithTimeout(url2, {
+              method: "GET",
+              headers: this.getHeaders()
+            });
+            if (response.status === 404) {
+              had404 = true;
+              lastError = `HTTP ${response.status}`;
+              continue;
+            }
+            if (!response.ok) {
+              const text = await response.text();
+              return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}`, had404 };
+            }
+            const data = await response.json();
+            const instructions = data.data?.user?.result?.timeline?.timeline?.instructions;
+            if (data.errors && data.errors.length > 0) {
+              const message = data.errors.map((e) => e.message).join(", ");
+              if (!instructions) {
+                if (message.includes("Query: Unspecified")) {
+                  lastError = message;
+                  continue;
+                }
+                return { success: false, error: message, had404 };
+              }
+            }
+            const pageTweets = parseTweetsFromInstructions(instructions, { quoteDepth: this.quoteDepth, includeRaw });
+            const extractedCursor = extractCursorFromInstructions(instructions);
+            return { success: true, tweets: pageTweets, cursor: extractedCursor, had404 };
+          } catch (error2) {
+            lastError = error2 instanceof Error ? error2.message : String(error2);
+          }
+        }
+        return { success: false, error: lastError ?? "Unknown error fetching likes", had404 };
+      };
+      const fetchWithRefresh = async (pageCount, pageCursor) => {
+        const firstAttempt = await fetchPage(pageCount, pageCursor);
+        if (firstAttempt.success) {
+          return firstAttempt;
+        }
+        const shouldRefresh = firstAttempt.had404 || typeof firstAttempt.error === "string" && firstAttempt.error.includes("Query: Unspecified");
+        if (shouldRefresh) {
+          await this.refreshQueryIds();
+          const secondAttempt = await fetchPage(pageCount, pageCursor);
+          if (secondAttempt.success) {
+            return secondAttempt;
+          }
+          return { success: false, error: secondAttempt.error };
+        }
+        return { success: false, error: firstAttempt.error };
+      };
+      const unlimited = limit === Number.POSITIVE_INFINITY;
+      while (unlimited || tweets.length < limit) {
+        const pageCount = unlimited ? pageSize : Math.min(pageSize, limit - tweets.length);
+        const page = await fetchWithRefresh(pageCount, cursor);
+        if (!page.success) {
+          return { success: false, error: page.error };
+        }
+        pagesFetched += 1;
+        let added = 0;
+        for (const tweet of page.tweets) {
+          if (seen.has(tweet.id)) {
+            continue;
+          }
+          seen.add(tweet.id);
+          tweets.push(tweet);
+          added += 1;
+          if (!unlimited && tweets.length >= limit) {
+            break;
+          }
+        }
+        const pageCursor = page.cursor;
+        if (!pageCursor || pageCursor === cursor || page.tweets.length === 0 || added === 0) {
+          nextCursor = void 0;
+          break;
+        }
+        if (maxPages && pagesFetched >= maxPages) {
+          nextCursor = pageCursor;
+          break;
+        }
+        cursor = pageCursor;
+        nextCursor = pageCursor;
+      }
+      return { success: true, tweets, nextCursor };
+    }
+    /**
+     * Get the authenticated user's bookmark folder timeline
+     */
+    async getBookmarkFolderTimeline(folderId, count = 20, options = {}) {
+      return this.getBookmarkFolderTimelinePaged(folderId, count, options);
+    }
+    async getAllBookmarkFolderTimeline(folderId, options) {
+      return this.getBookmarkFolderTimelinePaged(folderId, Number.POSITIVE_INFINITY, options);
+    }
+    async getBookmarksPaged(limit, options = {}) {
+      const features = buildBookmarksFeatures();
+      const pageSize = 20;
+      const seen = /* @__PURE__ */ new Set();
+      const tweets = [];
+      let cursor = options.cursor;
+      let nextCursor;
+      let pagesFetched = 0;
+      const { includeRaw = false, maxPages } = options;
+      const fetchPage = async (pageCount, pageCursor) => {
+        let lastError;
+        let had404 = false;
+        const queryIds = await this.getBookmarksQueryIds();
+        const variables = {
+          count: pageCount,
+          includePromotedContent: false,
+          withDownvotePerspective: false,
+          withReactionsMetadata: false,
+          withReactionsPerspective: false,
+          ...pageCursor ? { cursor: pageCursor } : {}
+        };
+        const params = new URLSearchParams({
+          variables: JSON.stringify(variables),
+          features: JSON.stringify(features)
+        });
+        for (const queryId of queryIds) {
+          const url2 = `${TWITTER_API_BASE}/${queryId}/Bookmarks?${params.toString()}`;
+          try {
+            this.logBookmarksDebug("request bookmarks page", {
+              queryId,
+              pageCount,
+              hasCursor: Boolean(pageCursor)
+            });
+            const response = await this.fetchWithRetry(url2, {
+              method: "GET",
+              headers: this.getHeaders()
+            });
+            if (response.status === 404) {
+              had404 = true;
+              lastError = `HTTP ${response.status}`;
+              this.logBookmarksDebug("bookmarks 404", { queryId });
+              continue;
+            }
+            if (!response.ok) {
+              const text = await response.text();
+              this.logBookmarksDebug("bookmarks non-200", {
+                queryId,
+                status: response.status,
+                body: text.slice(0, 200)
+              });
+              return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}`, had404 };
+            }
+            const data = await response.json();
+            const instructions = data.data?.bookmark_timeline_v2?.timeline?.instructions;
+            const pageTweets = parseTweetsFromInstructions(instructions, { quoteDepth: this.quoteDepth, includeRaw });
+            const nextCursor2 = extractCursorFromInstructions(instructions);
+            if (data.errors && data.errors.length > 0) {
+              this.logBookmarksDebug("bookmarks graphql errors (non-fatal)", { queryId, errors: data.errors });
+              if (!instructions) {
+                lastError = data.errors.map((e) => e.message).join(", ");
+                continue;
+              }
+            }
+            this.logBookmarksDebug("bookmarks page parsed", {
+              queryId,
+              tweets: pageTweets.length,
+              hasNextCursor: Boolean(nextCursor2)
+            });
+            return { success: true, tweets: pageTweets, cursor: nextCursor2, had404 };
+          } catch (error2) {
+            lastError = error2 instanceof Error ? error2.message : String(error2);
+            this.logBookmarksDebug("bookmarks request error", { queryId, error: lastError });
+          }
+        }
+        return { success: false, error: lastError ?? "Unknown error fetching bookmarks", had404 };
+      };
+      const fetchWithRefresh = async (pageCount, pageCursor) => {
+        const firstAttempt = await fetchPage(pageCount, pageCursor);
+        if (firstAttempt.success) {
+          return firstAttempt;
+        }
+        if (firstAttempt.had404) {
+          await this.refreshQueryIds();
+          const secondAttempt = await fetchPage(pageCount, pageCursor);
+          if (secondAttempt.success) {
+            return secondAttempt;
+          }
+          return { success: false, error: secondAttempt.error };
+        }
+        return { success: false, error: firstAttempt.error };
+      };
+      const unlimited = limit === Number.POSITIVE_INFINITY;
+      while (unlimited || tweets.length < limit) {
+        const pageCount = unlimited ? pageSize : Math.min(pageSize, limit - tweets.length);
+        const page = await fetchWithRefresh(pageCount, cursor);
+        if (!page.success) {
+          return { success: false, error: page.error };
+        }
+        pagesFetched += 1;
+        let added = 0;
+        for (const tweet of page.tweets) {
+          if (seen.has(tweet.id)) {
+            continue;
+          }
+          seen.add(tweet.id);
+          tweets.push(tweet);
+          added += 1;
+          if (!unlimited && tweets.length >= limit) {
+            break;
+          }
+        }
+        const pageCursor = page.cursor;
+        if (!pageCursor || pageCursor === cursor || page.tweets.length === 0 || added === 0) {
+          nextCursor = void 0;
+          break;
+        }
+        if (maxPages && pagesFetched >= maxPages) {
+          nextCursor = pageCursor;
+          break;
+        }
+        cursor = pageCursor;
+        nextCursor = pageCursor;
+      }
+      return { success: true, tweets, nextCursor };
+    }
+    async getBookmarkFolderTimelinePaged(folderId, limit, options = {}) {
+      const features = buildBookmarksFeatures();
+      const pageSize = 20;
+      const seen = /* @__PURE__ */ new Set();
+      const tweets = [];
+      let cursor = options.cursor;
+      let nextCursor;
+      let pagesFetched = 0;
+      const { includeRaw = false, maxPages } = options;
+      const buildVariables = (pageCount, pageCursor, includeCount) => ({
+        bookmark_collection_id: folderId,
+        includePromotedContent: true,
+        ...includeCount ? { count: pageCount } : {},
+        ...pageCursor ? { cursor: pageCursor } : {}
+      });
+      const fetchPage = async (pageCount, pageCursor) => {
+        let lastError;
+        let had404 = false;
+        const queryIds = await this.getBookmarkFolderQueryIds();
+        const tryOnce = async (variables) => {
+          const params = new URLSearchParams({
+            variables: JSON.stringify(variables),
+            features: JSON.stringify(features)
+          });
+          for (const queryId of queryIds) {
+            const url2 = `${TWITTER_API_BASE}/${queryId}/BookmarkFolderTimeline?${params.toString()}`;
+            try {
+              this.logBookmarksDebug("request bookmark folder page", {
+                queryId,
+                pageCount,
+                hasCursor: Boolean(pageCursor),
+                includeCount: Object.hasOwn(variables, "count")
+              });
+              const response = await this.fetchWithRetry(url2, {
+                method: "GET",
+                headers: this.getHeaders()
+              });
+              if (response.status === 404) {
+                had404 = true;
+                lastError = `HTTP ${response.status}`;
+                this.logBookmarksDebug("bookmark folder 404", { queryId });
+                continue;
+              }
+              if (!response.ok) {
+                const text = await response.text();
+                this.logBookmarksDebug("bookmark folder non-200", {
+                  queryId,
+                  status: response.status,
+                  body: text.slice(0, 200)
+                });
+                return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}`, had404 };
+              }
+              const data = await response.json();
+              const instructions = data.data?.bookmark_collection_timeline?.timeline?.instructions;
+              const pageTweets = parseTweetsFromInstructions(instructions, { quoteDepth: this.quoteDepth, includeRaw });
+              const nextCursor2 = extractCursorFromInstructions(instructions);
+              if (data.errors && data.errors.length > 0) {
+                this.logBookmarksDebug("bookmark folder graphql errors (non-fatal)", { queryId, errors: data.errors });
+                if (!instructions) {
+                  lastError = data.errors.map((e) => e.message).join(", ");
+                  continue;
+                }
+              }
+              this.logBookmarksDebug("bookmark folder page parsed", {
+                queryId,
+                tweets: pageTweets.length,
+                hasNextCursor: Boolean(nextCursor2)
+              });
+              return { success: true, tweets: pageTweets, cursor: nextCursor2, had404 };
+            } catch (error2) {
+              lastError = error2 instanceof Error ? error2.message : String(error2);
+              this.logBookmarksDebug("bookmark folder request error", { queryId, error: lastError });
+            }
+          }
+          return { success: false, error: lastError ?? "Unknown error fetching bookmark folder", had404 };
+        };
+        let attempt = await tryOnce(buildVariables(pageCount, pageCursor, true));
+        if (!attempt.success && attempt.error?.includes('Variable "$count"')) {
+          attempt = await tryOnce(buildVariables(pageCount, pageCursor, false));
+        }
+        if (!attempt.success && attempt.error?.includes('Variable "$cursor"') && pageCursor) {
+          return {
+            success: false,
+            error: "Bookmark folder pagination rejected the cursor parameter",
+            had404: attempt.had404
+          };
+        }
+        return attempt;
+      };
+      const fetchWithRefresh = async (pageCount, pageCursor) => {
+        const firstAttempt = await fetchPage(pageCount, pageCursor);
+        if (firstAttempt.success) {
+          return firstAttempt;
+        }
+        if (firstAttempt.had404) {
+          await this.refreshQueryIds();
+          const secondAttempt = await fetchPage(pageCount, pageCursor);
+          if (secondAttempt.success) {
+            return secondAttempt;
+          }
+          return { success: false, error: secondAttempt.error };
+        }
+        return { success: false, error: firstAttempt.error };
+      };
+      const unlimited = limit === Number.POSITIVE_INFINITY;
+      while (unlimited || tweets.length < limit) {
+        const pageCount = unlimited ? pageSize : Math.min(pageSize, limit - tweets.length);
+        const page = await fetchWithRefresh(pageCount, cursor);
+        if (!page.success) {
+          return { success: false, error: page.error };
+        }
+        pagesFetched += 1;
+        let added = 0;
+        for (const tweet of page.tweets) {
+          if (seen.has(tweet.id)) {
+            continue;
+          }
+          seen.add(tweet.id);
+          tweets.push(tweet);
+          added += 1;
+          if (!unlimited && tweets.length >= limit) {
+            break;
+          }
+        }
+        const pageCursor = page.cursor;
+        if (!pageCursor || pageCursor === cursor || page.tweets.length === 0 || added === 0) {
+          nextCursor = void 0;
+          break;
+        }
+        if (maxPages && pagesFetched >= maxPages) {
+          nextCursor = pageCursor;
+          break;
+        }
+        cursor = pageCursor;
+        nextCursor = pageCursor;
+      }
+      return { success: true, tweets, nextCursor };
+    }
+    async fetchWithRetry(url2, init) {
+      const maxRetries = 2;
+      const baseDelayMs = 500;
+      const retryable = /* @__PURE__ */ new Set([429, 500, 502, 503, 504]);
+      for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+        const response = await this.fetchWithTimeout(url2, init);
+        if (!retryable.has(response.status) || attempt === maxRetries) {
+          return response;
+        }
+        this.logBookmarksDebug("retrying bookmarks request", {
+          status: response.status,
+          attempt
+        });
+        const retryAfter = response.headers?.get?.("retry-after");
+        const retryAfterMs = retryAfter ? Number.parseInt(retryAfter, 10) * 1e3 : Number.NaN;
+        const backoffMs = Number.isFinite(retryAfterMs) ? retryAfterMs : baseDelayMs * 2 ** attempt + Math.floor(Math.random() * baseDelayMs);
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      }
+      return this.fetchWithTimeout(url2, init);
+    }
+  }
+  return TwitterClientTimelines;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/paginate-cursor.js
+async function paginateCursor(opts) {
+  const { maxPages, pageDelayMs = 1e3 } = opts;
+  const seen = /* @__PURE__ */ new Set();
+  const items = [];
+  let cursor = opts.cursor;
+  let pagesFetched = 0;
+  while (true) {
+    if (pagesFetched > 0 && pageDelayMs > 0) {
+      await opts.sleep(pageDelayMs);
+    }
+    const page = await opts.fetchPage(cursor);
+    if (!page.success) {
+      if (items.length > 0) {
+        return { success: false, error: page.error, items, nextCursor: cursor };
+      }
+      return page;
+    }
+    pagesFetched += 1;
+    for (const item of page.items) {
+      const key = opts.getKey(item);
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      items.push(item);
+    }
+    const pageCursor = page.cursor;
+    if (!pageCursor || pageCursor === cursor) {
+      return { success: true, items, nextCursor: void 0 };
+    }
+    if (maxPages !== void 0 && pagesFetched >= maxPages) {
+      return { success: true, items, nextCursor: pageCursor };
+    }
+    cursor = pageCursor;
+  }
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-tweet-detail.js
+function withTweetDetails(Base) {
+  class TwitterClientTweetDetails extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    async fetchUserArticlePlainText(userId, tweetId) {
+      const variables = {
+        userId,
+        count: 20,
+        includePromotedContent: true,
+        withVoice: true,
+        withQuickPromoteEligibilityTweetFields: true,
+        withBirdwatchNotes: true,
+        withCommunity: true,
+        withSafetyModeUserFields: true,
+        withSuperFollowsUserFields: true,
+        withDownvotePerspective: false,
+        withReactionsMetadata: false,
+        withReactionsPerspective: false,
+        withSuperFollowsTweetFields: true,
+        withSuperFollowsReplyCount: false,
+        withClientEventToken: false
+      };
+      const params = new URLSearchParams({
+        variables: JSON.stringify(variables),
+        features: JSON.stringify(buildArticleFeatures()),
+        fieldToggles: JSON.stringify(buildArticleFieldToggles())
+      });
+      const queryId = await this.getQueryId("UserArticlesTweets");
+      const url2 = `${TWITTER_API_BASE}/${queryId}/UserArticlesTweets?${params.toString()}`;
+      try {
+        const response = await this.fetchWithTimeout(url2, { method: "GET", headers: this.getHeaders() });
+        if (!response.ok) {
+          return {};
+        }
+        const data = await response.json();
+        const instructions = data.data?.user?.result?.timeline?.timeline?.instructions ?? [];
+        for (const instruction of instructions) {
+          for (const entry of instruction.entries ?? []) {
+            const result = entry.content?.itemContent?.tweet_results?.result;
+            if (result?.rest_id !== tweetId) {
+              continue;
+            }
+            const articleResult = result.article?.article_results?.result;
+            const title = firstText(articleResult?.title, result.article?.title);
+            const plainText = firstText(articleResult?.plain_text, result.article?.plain_text);
+            return { title, plainText };
+          }
+        }
+      } catch {
+        return {};
+      }
+      return {};
+    }
+    async fetchTweetDetail(tweetId, cursor) {
+      const variables = {
+        focalTweetId: tweetId,
+        with_rux_injections: false,
+        rankingMode: "Relevance",
+        includePromotedContent: true,
+        withCommunity: true,
+        withQuickPromoteEligibilityTweetFields: true,
+        withBirdwatchNotes: true,
+        withVoice: true,
+        ...cursor ? { cursor } : {}
+      };
+      const features = {
+        ...buildTweetDetailFeatures(),
+        articles_preview_enabled: true,
+        articles_rest_api_enabled: true,
+        responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+        creator_subscriptions_tweet_preview_api_enabled: true,
+        graphql_is_translatable_rweb_tweet_is_translatable_enabled: true,
+        view_counts_everywhere_api_enabled: true,
+        longform_notetweets_consumption_enabled: true,
+        responsive_web_twitter_article_tweet_consumption_enabled: true,
+        freedom_of_speech_not_reach_fetch_enabled: true,
+        standardized_nudges_misinfo: true,
+        tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled: true,
+        rweb_video_timestamps_enabled: true
+      };
+      const fieldToggles = {
+        ...buildArticleFieldToggles(),
+        withArticleRichContentState: true
+      };
+      const params = new URLSearchParams({
+        variables: JSON.stringify(variables),
+        features: JSON.stringify(features),
+        fieldToggles: JSON.stringify(fieldToggles)
+      });
+      try {
+        const parseResponse = async (response) => {
+          if (!response.ok) {
+            const text = await response.text();
+            return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}` };
+          }
+          const data = await response.json();
+          if (data.errors && data.errors.length > 0) {
+            const hasUsableData = Boolean(data.data?.tweetResult?.result || data.data?.threaded_conversation_with_injections_v2?.instructions?.length);
+            if (!hasUsableData) {
+              return { success: false, error: data.errors.map((e) => e.message).join(", ") };
+            }
+          }
+          return { success: true, data: data.data ?? {} };
+        };
+        let lastError;
+        let had404 = false;
+        const tryOnce = async () => {
+          const queryIds = await this.getTweetDetailQueryIds();
+          for (const queryId of queryIds) {
+            const url2 = `${TWITTER_API_BASE}/${queryId}/TweetDetail?${params.toString()}`;
+            const response = await this.fetchWithTimeout(url2, {
+              method: "GET",
+              headers: this.getHeaders()
+            });
+            if (response.status !== 404) {
+              return await parseResponse(response);
+            }
+            had404 = true;
+            const postResponse = await this.fetchWithTimeout(`${TWITTER_API_BASE}/${queryId}/TweetDetail`, {
+              method: "POST",
+              headers: this.getHeaders(),
+              body: JSON.stringify({ variables, features, queryId })
+            });
+            if (postResponse.status !== 404) {
+              return await parseResponse(postResponse);
+            }
+            lastError = "HTTP 404";
+          }
+          return { success: false, error: lastError ?? "Unknown error fetching tweet detail" };
+        };
+        const firstAttempt = await tryOnce();
+        if (firstAttempt.success) {
+          return firstAttempt;
+        }
+        if (had404) {
+          await this.refreshQueryIds();
+          return await tryOnce();
+        }
+        return firstAttempt;
+      } catch (error2) {
+        return { success: false, error: error2 instanceof Error ? error2.message : String(error2) };
+      }
+    }
+    /**
+     * Get tweet details by ID
+     */
+    async getTweet(tweetId, options = {}) {
+      const { includeRaw = false } = options;
+      const response = await this.fetchTweetDetail(tweetId);
+      if (!response.success) {
+        return response;
+      }
+      const tweetResult = response.data.tweetResult?.result ?? findTweetInInstructions(response.data.threaded_conversation_with_injections_v2?.instructions, tweetId);
+      const mapped = mapTweetResult(tweetResult, { quoteDepth: this.quoteDepth, includeRaw });
+      if (mapped) {
+        if (tweetResult?.article) {
+          const title = firstText(tweetResult.article.article_results?.result?.title, tweetResult.article.title);
+          const articleText = extractArticleText(tweetResult);
+          if (title && (!articleText || articleText.trim() === title.trim())) {
+            const userId = tweetResult.core?.user_results?.result?.rest_id;
+            if (userId) {
+              const fallback = await this.fetchUserArticlePlainText(userId, tweetId);
+              if (fallback.plainText) {
+                mapped.text = fallback.title ? `${fallback.title}
+
+${fallback.plainText}` : fallback.plainText;
+              }
+            }
+          }
+        }
+        return { success: true, tweet: mapped };
+      }
+      return { success: false, error: "Tweet not found in response" };
+    }
+    /**
+     * Get replies to a tweet by ID
+     */
+    async getReplies(tweetId, options = {}) {
+      const { includeRaw = false } = options;
+      const response = await this.fetchTweetDetail(tweetId);
+      if (!response.success) {
+        return response;
+      }
+      const instructions = response.data.threaded_conversation_with_injections_v2?.instructions;
+      const tweets = parseTweetsFromInstructions(instructions, { quoteDepth: this.quoteDepth, includeRaw });
+      const replies = tweets.filter((tweet) => tweet.inReplyToStatusId === tweetId);
+      return { success: true, tweets: replies };
+    }
+    /**
+     * Get full conversation thread for a tweet ID
+     */
+    async getThread(tweetId, options = {}) {
+      const { includeRaw = false } = options;
+      const response = await this.fetchTweetDetail(tweetId);
+      if (!response.success) {
+        return response;
+      }
+      const instructions = response.data.threaded_conversation_with_injections_v2?.instructions;
+      const tweets = parseTweetsFromInstructions(instructions, { quoteDepth: this.quoteDepth, includeRaw });
+      const target = tweets.find((t) => t.id === tweetId);
+      const rootId = target?.conversationId || tweetId;
+      const thread = tweets.filter((tweet) => tweet.conversationId === rootId);
+      thread.sort((a, b) => {
+        const aTime = a.createdAt ? Date.parse(a.createdAt) : 0;
+        const bTime = b.createdAt ? Date.parse(b.createdAt) : 0;
+        return aTime - bTime;
+      });
+      return { success: true, tweets: thread };
+    }
+    /**
+     * Get replies to a tweet with pagination support
+     */
+    async getRepliesPaged(tweetId, options = {}) {
+      const { includeRaw = false, maxPages, pageDelayMs = 1e3 } = options;
+      const result = await paginateCursor({
+        cursor: options.cursor,
+        maxPages,
+        pageDelayMs,
+        sleep: async (ms) => this.sleep(ms),
+        getKey: (tweet) => tweet.id,
+        fetchPage: async (cursor) => {
+          const response = await this.fetchTweetDetail(tweetId, cursor);
+          if (!response.success) {
+            return response;
+          }
+          const instructions = response.data.threaded_conversation_with_injections_v2?.instructions;
+          const tweets = parseTweetsFromInstructions(instructions, { quoteDepth: this.quoteDepth, includeRaw });
+          const replies = tweets.filter((tweet) => tweet.inReplyToStatusId === tweetId);
+          const pageCursor = extractCursorFromInstructions(instructions);
+          return { success: true, items: replies, cursor: pageCursor };
+        }
+      });
+      if (result.success) {
+        return { success: true, tweets: result.items, nextCursor: result.nextCursor };
+      }
+      if (result.items) {
+        return { success: false, tweets: result.items, nextCursor: result.nextCursor, error: result.error };
+      }
+      return { success: false, error: result.error };
+    }
+    /**
+     * Get full conversation thread with pagination support
+     */
+    async getThreadPaged(tweetId, options = {}) {
+      const { includeRaw = false, maxPages, pageDelayMs = 1e3 } = options;
+      let rootId;
+      const result = await paginateCursor({
+        cursor: options.cursor,
+        maxPages,
+        pageDelayMs,
+        sleep: async (ms) => this.sleep(ms),
+        getKey: (tweet) => tweet.id,
+        fetchPage: async (cursor) => {
+          const response = await this.fetchTweetDetail(tweetId, cursor);
+          if (!response.success) {
+            return response;
+          }
+          const instructions = response.data.threaded_conversation_with_injections_v2?.instructions;
+          const tweets = parseTweetsFromInstructions(instructions, { quoteDepth: this.quoteDepth, includeRaw });
+          if (!rootId) {
+            const target = tweets.find((t) => t.id === tweetId);
+            rootId = target?.conversationId || tweetId;
+          }
+          const threadTweets = tweets.filter((tweet) => tweet.conversationId === rootId);
+          const pageCursor = extractCursorFromInstructions(instructions);
+          return { success: true, items: threadTweets, cursor: pageCursor };
+        }
+      });
+      const sortedTweets = (result.items ?? []).slice().sort((a, b) => {
+        const aTime = a.createdAt ? Date.parse(a.createdAt) : 0;
+        const bTime = b.createdAt ? Date.parse(b.createdAt) : 0;
+        return aTime - bTime;
+      });
+      if (result.success) {
+        return { success: true, tweets: sortedTweets, nextCursor: result.nextCursor };
+      }
+      if (result.items) {
+        return { success: false, tweets: sortedTweets, nextCursor: result.nextCursor, error: result.error };
+      }
+      return { success: false, error: result.error };
+    }
+  }
+  return TwitterClientTweetDetails;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/normalize-handle.js
+var HANDLE_REGEX = /^[A-Za-z0-9_]{1,15}$/;
+function normalizeHandle(input) {
+  const raw = (input ?? "").trim();
+  if (!raw) {
+    return null;
+  }
+  const withoutAt = raw.startsWith("@") ? raw.slice(1) : raw;
+  const handle = withoutAt.trim();
+  if (!handle) {
+    return null;
+  }
+  if (!HANDLE_REGEX.test(handle)) {
+    return null;
+  }
+  return handle;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-user-lookup.js
+function withUserLookup(Base) {
+  class TwitterClientUserLookup extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    async getUserByScreenNameGraphQL(screenName) {
+      const queryIds = ["xc8f1g7BYqr6VTzTbvNlGw", "qW5u-DAuXpMEG0zA1F7UGQ", "sLVLhk0bGj3MVFEKTdax1w"];
+      const variables = {
+        screen_name: screenName,
+        withSafetyModeUserFields: true
+      };
+      const features = {
+        hidden_profile_subscriptions_enabled: true,
+        hidden_profile_likes_enabled: true,
+        rweb_tipjar_consumption_enabled: true,
+        responsive_web_graphql_exclude_directive_enabled: true,
+        verified_phone_label_enabled: false,
+        subscriptions_verification_info_is_identity_verified_enabled: true,
+        subscriptions_verification_info_verified_since_enabled: true,
+        highlights_tweets_tab_ui_enabled: true,
+        responsive_web_twitter_article_notes_tab_enabled: true,
+        subscriptions_feature_can_gift_premium: true,
+        creator_subscriptions_tweet_preview_api_enabled: true,
+        responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+        responsive_web_graphql_timeline_navigation_enabled: true,
+        blue_business_profile_image_shape_enabled: true
+      };
+      const fieldToggles = {
+        withAuxiliaryUserLabels: false
+      };
+      const params = new URLSearchParams({
+        variables: JSON.stringify(variables),
+        features: JSON.stringify(features),
+        fieldToggles: JSON.stringify(fieldToggles)
+      });
+      let lastError;
+      for (const queryId of queryIds) {
+        const url2 = `${TWITTER_API_BASE}/${queryId}/UserByScreenName?${params.toString()}`;
+        try {
+          const response = await this.fetchWithTimeout(url2, {
+            method: "GET",
+            headers: this.getHeaders()
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            if (response.status === 404) {
+              lastError = `HTTP ${response.status}`;
+              continue;
+            }
+            lastError = `HTTP ${response.status}: ${text.slice(0, 200)}`;
+            continue;
+          }
+          const data = await response.json();
+          if (data.data?.user?.result?.__typename === "UserUnavailable") {
+            return { success: false, error: `User @${screenName} not found or unavailable` };
+          }
+          const userResult = data.data?.user?.result;
+          const userId = userResult?.rest_id;
+          const username = userResult?.legacy?.screen_name ?? userResult?.core?.screen_name;
+          const name = userResult?.legacy?.name ?? userResult?.core?.name;
+          if (userId && username) {
+            return {
+              success: true,
+              userId,
+              username,
+              name
+            };
+          }
+          if (data.errors && data.errors.length > 0) {
+            lastError = data.errors.map((e) => e.message).join(", ");
+            continue;
+          }
+          lastError = "Could not parse user data from response";
+        } catch (error2) {
+          lastError = error2 instanceof Error ? error2.message : String(error2);
+        }
+      }
+      return { success: false, error: lastError ?? "Unknown error looking up user" };
+    }
+    /**
+     * Look up a user's ID by their username/handle.
+     * Uses GraphQL UserByScreenName first, then falls back to REST on transient failures.
+     */
+    async getUserIdByUsername(username) {
+      const cleanUsername = normalizeHandle(username);
+      if (!cleanUsername) {
+        return { success: false, error: `Invalid username: ${username}` };
+      }
+      const graphqlResult = await this.getUserByScreenNameGraphQL(cleanUsername);
+      if (graphqlResult.success) {
+        return graphqlResult;
+      }
+      if (graphqlResult.error?.includes("not found or unavailable")) {
+        return graphqlResult;
+      }
+      const urls = [
+        `https://x.com/i/api/1.1/users/show.json?screen_name=${encodeURIComponent(cleanUsername)}`,
+        `https://api.twitter.com/1.1/users/show.json?screen_name=${encodeURIComponent(cleanUsername)}`
+      ];
+      let lastError = graphqlResult.error;
+      for (const url2 of urls) {
+        try {
+          const response = await this.fetchWithTimeout(url2, {
+            method: "GET",
+            headers: this.getHeaders()
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            if (response.status === 404) {
+              return { success: false, error: `User @${cleanUsername} not found` };
+            }
+            lastError = `HTTP ${response.status}: ${text.slice(0, 200)}`;
+            continue;
+          }
+          const data = await response.json();
+          const userId = data.id_str ?? (data.id ? String(data.id) : null);
+          if (!userId) {
+            lastError = "Could not parse user ID from response";
+            continue;
+          }
+          return {
+            success: true,
+            userId,
+            username: data.screen_name ?? cleanUsername,
+            name: data.name
+          };
+        } catch (error2) {
+          lastError = error2 instanceof Error ? error2.message : String(error2);
+        }
+      }
+      return { success: false, error: lastError ?? "Unknown error looking up user" };
+    }
+    async getAboutAccountQueryIds() {
+      const primary = await this.getQueryId("AboutAccountQuery");
+      return Array.from(/* @__PURE__ */ new Set([primary, "zs_jFPFT78rBpXv9Z3U2YQ"]));
+    }
+    /**
+     * Get account origin and location information for a user.
+     * Returns data from Twitter's "About this account" feature.
+     */
+    async getUserAboutAccount(username) {
+      const cleanUsername = normalizeHandle(username);
+      if (!cleanUsername) {
+        return { success: false, error: `Invalid username: ${username}` };
+      }
+      const variables = {
+        screenName: cleanUsername
+      };
+      const params = new URLSearchParams({
+        variables: JSON.stringify(variables)
+      });
+      const tryOnce = async () => {
+        let lastError;
+        let had404 = false;
+        const queryIds = await this.getAboutAccountQueryIds();
+        for (const queryId of queryIds) {
+          const url2 = `${TWITTER_API_BASE}/${queryId}/AboutAccountQuery?${params.toString()}`;
+          try {
+            const response = await this.fetchWithTimeout(url2, {
+              method: "GET",
+              headers: this.getHeaders()
+            });
+            if (!response.ok) {
+              const text = await response.text();
+              if (response.status === 404) {
+                had404 = true;
+                lastError = `HTTP ${response.status}`;
+                continue;
+              }
+              lastError = `HTTP ${response.status}: ${text.slice(0, 200)}`;
+              continue;
+            }
+            const data = await response.json();
+            if (data.errors && data.errors.length > 0) {
+              lastError = data.errors.map((e) => e.message).join(", ");
+              continue;
+            }
+            const aboutProfile = data.data?.user_result_by_screen_name?.result?.about_profile;
+            if (!aboutProfile) {
+              lastError = "Missing about_profile in response";
+              continue;
+            }
+            return {
+              success: true,
+              aboutProfile: {
+                accountBasedIn: aboutProfile.account_based_in,
+                source: aboutProfile.source,
+                createdCountryAccurate: aboutProfile.created_country_accurate,
+                locationAccurate: aboutProfile.location_accurate,
+                learnMoreUrl: aboutProfile.learn_more_url
+              },
+              had404
+            };
+          } catch (error2) {
+            lastError = error2 instanceof Error ? error2.message : String(error2);
+          }
+        }
+        return {
+          success: false,
+          error: lastError ?? "Unknown error fetching account details",
+          had404
+        };
+      };
+      const { result } = await this.withRefreshedQueryIdsOn404(tryOnce);
+      if (result.success) {
+        return { success: true, aboutProfile: result.aboutProfile };
+      }
+      return { success: false, error: result.error };
+    }
+  }
+  return TwitterClientUserLookup;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-user-tweets.js
+function withUserTweets(Base) {
+  class TwitterClientUserTweets extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    async getUserTweetsQueryIds() {
+      const primary = await this.getQueryId("UserTweets");
+      return Array.from(/* @__PURE__ */ new Set([primary, "Wms1GvIiHXAPBaCr9KblaA"]));
+    }
+    /**
+     * Get tweets from a user's profile timeline (single page).
+     */
+    async getUserTweets(userId, count = 20, options = {}) {
+      return this.getUserTweetsPaged(userId, count, options);
+    }
+    /**
+     * Get tweets from a user's profile timeline with pagination support.
+     */
+    async getUserTweetsPaged(userId, limit, options = {}) {
+      if (!Number.isFinite(limit) || limit <= 0) {
+        return { success: false, error: `Invalid limit: ${limit}` };
+      }
+      const { includeRaw = false, maxPages, pageDelayMs = 1e3 } = options;
+      const features = buildUserTweetsFeatures();
+      const pageSize = 20;
+      const seen = /* @__PURE__ */ new Set();
+      const tweets = [];
+      let cursor = options.cursor;
+      let nextCursor;
+      let pagesFetched = 0;
+      const hardMaxPages = 10;
+      const computedMaxPages = Math.max(1, Math.ceil(limit / pageSize));
+      const effectiveMaxPages = Math.min(hardMaxPages, maxPages ?? computedMaxPages);
+      const fetchPage = async (pageCount, pageCursor) => {
+        let lastError;
+        let had404 = false;
+        const queryIds = await this.getUserTweetsQueryIds();
+        const variables = {
+          userId,
+          count: pageCount,
+          includePromotedContent: false,
+          // Filter out ads
+          withQuickPromoteEligibilityTweetFields: true,
+          withVoice: true,
+          ...pageCursor ? { cursor: pageCursor } : {}
+        };
+        const fieldToggles = {
+          withArticlePlainText: false
+        };
+        const params = new URLSearchParams({
+          variables: JSON.stringify(variables),
+          features: JSON.stringify(features),
+          fieldToggles: JSON.stringify(fieldToggles)
+        });
+        for (const queryId of queryIds) {
+          const url2 = `${TWITTER_API_BASE}/${queryId}/UserTweets?${params.toString()}`;
+          try {
+            const response = await this.fetchWithTimeout(url2, {
+              method: "GET",
+              headers: this.getHeaders()
+            });
+            if (response.status === 404) {
+              had404 = true;
+              lastError = `HTTP ${response.status}`;
+              continue;
+            }
+            if (!response.ok) {
+              const text = await response.text();
+              return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}`, had404 };
+            }
+            const data = await response.json();
+            if (data.errors && data.errors.length > 0) {
+              const errorMsg = data.errors.map((e) => e.message).join(", ");
+              if (errorMsg.includes("User has been suspended") || errorMsg.includes("User not found")) {
+                return { success: false, error: errorMsg, had404 };
+              }
+              if (!data.data?.user?.result?.timeline?.timeline?.instructions) {
+                return { success: false, error: errorMsg, had404 };
+              }
+            }
+            const instructions = data.data?.user?.result?.timeline?.timeline?.instructions;
+            const pageTweets = parseTweetsFromInstructions(instructions, { quoteDepth: this.quoteDepth, includeRaw });
+            const pageCursorValue = extractCursorFromInstructions(instructions);
+            return { success: true, tweets: pageTweets, cursor: pageCursorValue, had404 };
+          } catch (error2) {
+            lastError = error2 instanceof Error ? error2.message : String(error2);
+          }
+        }
+        return { success: false, error: lastError ?? "Unknown error fetching user tweets", had404 };
+      };
+      const fetchWithRefresh = async (pageCount, pageCursor) => {
+        const firstAttempt = await fetchPage(pageCount, pageCursor);
+        if (firstAttempt.success) {
+          return firstAttempt;
+        }
+        if (firstAttempt.had404) {
+          await this.refreshQueryIds();
+          const secondAttempt = await fetchPage(pageCount, pageCursor);
+          if (secondAttempt.success) {
+            return secondAttempt;
+          }
+          return { success: false, error: secondAttempt.error };
+        }
+        return { success: false, error: firstAttempt.error };
+      };
+      while (tweets.length < limit) {
+        if (pagesFetched > 0 && pageDelayMs > 0) {
+          await this.sleep(pageDelayMs);
+        }
+        const remaining = limit - tweets.length;
+        const pageCount = Math.min(pageSize, remaining);
+        const page = await fetchWithRefresh(pageCount, cursor);
+        if (!page.success) {
+          return { success: false, error: page.error };
+        }
+        pagesFetched += 1;
+        let added = 0;
+        for (const tweet of page.tweets) {
+          if (seen.has(tweet.id)) {
+            continue;
+          }
+          seen.add(tweet.id);
+          tweets.push(tweet);
+          added += 1;
+          if (tweets.length >= limit) {
+            break;
+          }
+        }
+        const pageCursor = page.cursor;
+        if (!pageCursor || pageCursor === cursor || page.tweets.length === 0 || added === 0) {
+          nextCursor = void 0;
+          break;
+        }
+        if (pagesFetched >= effectiveMaxPages) {
+          nextCursor = pageCursor;
+          break;
+        }
+        cursor = pageCursor;
+        nextCursor = pageCursor;
+      }
+      return { success: true, tweets, nextCursor };
+    }
+  }
+  return TwitterClientUserTweets;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client-users.js
+function withUsers(Base) {
+  class TwitterClientUsers extends Base {
+    // biome-ignore lint/complexity/noUselessConstructor lint/suspicious/noExplicitAny: TS mixin constructor requirement.
+    constructor(...args) {
+      super(...args);
+    }
+    async getFollowingQueryIds() {
+      const primary = await this.getQueryId("Following");
+      return Array.from(/* @__PURE__ */ new Set([primary, "BEkNpEt5pNETESoqMsTEGA"]));
+    }
+    async getFollowersQueryIds() {
+      const primary = await this.getQueryId("Followers");
+      return Array.from(/* @__PURE__ */ new Set([primary, "kuFUYP9eV1FPoEy4N-pi7w"]));
+    }
+    parseUsersFromRestResponse(users) {
+      return (users ?? []).map((u) => {
+        const id = typeof u.id_str === "string" ? u.id_str : typeof u.id === "number" ? String(u.id) : null;
+        const username = typeof u.screen_name === "string" ? u.screen_name : null;
+        if (!id || !username) {
+          return null;
+        }
+        return {
+          id,
+          username,
+          name: typeof u.name === "string" && u.name.length > 0 ? u.name : username,
+          description: typeof u.description === "string" ? u.description : void 0,
+          followersCount: typeof u.followers_count === "number" ? u.followers_count : void 0,
+          followingCount: typeof u.friends_count === "number" ? u.friends_count : void 0,
+          isBlueVerified: typeof u.verified === "boolean" ? u.verified : void 0,
+          profileImageUrl: typeof u.profile_image_url_https === "string" ? u.profile_image_url_https : void 0,
+          createdAt: typeof u.created_at === "string" ? u.created_at : void 0
+        };
+      }).filter((u) => u !== null);
+    }
+    async getFollowersViaRest(userId, count, cursor) {
+      const params = new URLSearchParams({
+        user_id: userId,
+        count: String(count),
+        skip_status: "true",
+        include_user_entities: "false"
+      });
+      if (cursor) {
+        params.set("cursor", cursor);
+      }
+      const urls = [
+        `https://x.com/i/api/1.1/followers/list.json?${params.toString()}`,
+        `https://api.twitter.com/1.1/followers/list.json?${params.toString()}`
+      ];
+      let lastError;
+      for (const url2 of urls) {
+        try {
+          const response = await this.fetchWithTimeout(url2, {
+            method: "GET",
+            headers: this.getHeaders()
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            lastError = `HTTP ${response.status}: ${text.slice(0, 200)}`;
+            continue;
+          }
+          const data = await response.json();
+          const users = this.parseUsersFromRestResponse(data.users);
+          const nextCursor = data.next_cursor_str && data.next_cursor_str !== "0" ? data.next_cursor_str : void 0;
+          return { success: true, users, nextCursor };
+        } catch (error2) {
+          lastError = error2 instanceof Error ? error2.message : String(error2);
+        }
+      }
+      return { success: false, error: lastError ?? "Unknown error fetching followers" };
+    }
+    async getFollowingViaRest(userId, count, cursor) {
+      const params = new URLSearchParams({
+        user_id: userId,
+        count: String(count),
+        skip_status: "true",
+        include_user_entities: "false"
+      });
+      if (cursor) {
+        params.set("cursor", cursor);
+      }
+      const urls = [
+        `https://x.com/i/api/1.1/friends/list.json?${params.toString()}`,
+        `https://api.twitter.com/1.1/friends/list.json?${params.toString()}`
+      ];
+      let lastError;
+      for (const url2 of urls) {
+        try {
+          const response = await this.fetchWithTimeout(url2, {
+            method: "GET",
+            headers: this.getHeaders()
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            lastError = `HTTP ${response.status}: ${text.slice(0, 200)}`;
+            continue;
+          }
+          const data = await response.json();
+          const users = this.parseUsersFromRestResponse(data.users);
+          const nextCursor = data.next_cursor_str && data.next_cursor_str !== "0" ? data.next_cursor_str : void 0;
+          return { success: true, users, nextCursor };
+        } catch (error2) {
+          lastError = error2 instanceof Error ? error2.message : String(error2);
+        }
+      }
+      return { success: false, error: lastError ?? "Unknown error fetching following" };
+    }
+    /**
+     * Fetch the account associated with the current cookies
+     */
+    async getCurrentUser() {
+      const candidateUrls = [
+        "https://x.com/i/api/account/settings.json",
+        "https://api.twitter.com/1.1/account/settings.json",
+        "https://x.com/i/api/account/verify_credentials.json?skip_status=true&include_entities=false",
+        "https://api.twitter.com/1.1/account/verify_credentials.json?skip_status=true&include_entities=false"
+      ];
+      let lastError;
+      for (const url2 of candidateUrls) {
+        try {
+          const response = await this.fetchWithTimeout(url2, {
+            method: "GET",
+            headers: this.getHeaders()
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            lastError = `HTTP ${response.status}: ${text.slice(0, 200)}`;
+            continue;
+          }
+          let data;
+          try {
+            data = await response.json();
+          } catch (error2) {
+            lastError = error2 instanceof Error ? error2.message : String(error2);
+            continue;
+          }
+          const username = typeof data?.screen_name === "string" ? data.screen_name : typeof data?.user?.screen_name === "string" ? data.user.screen_name : null;
+          const name = typeof data?.name === "string" ? data.name : typeof data?.user?.name === "string" ? data.user.name : username ?? "";
+          const userId = typeof data?.user_id === "string" ? data.user_id : typeof data?.user_id_str === "string" ? data.user_id_str : typeof data?.user?.id_str === "string" ? data.user.id_str : typeof data?.user?.id === "string" ? data.user.id : null;
+          if (username && userId) {
+            this.clientUserId = userId;
+            return {
+              success: true,
+              user: {
+                id: userId,
+                username,
+                name: name || username
+              }
+            };
+          }
+          lastError = "Could not determine current user from response";
+        } catch (error2) {
+          lastError = error2 instanceof Error ? error2.message : String(error2);
+        }
+      }
+      const profilePages = ["https://x.com/settings/account", "https://twitter.com/settings/account"];
+      for (const page of profilePages) {
+        try {
+          const response = await this.fetchWithTimeout(page, {
+            headers: {
+              cookie: this.cookieHeader,
+              "user-agent": this.userAgent
+            }
+          });
+          if (!response.ok) {
+            lastError = `HTTP ${response.status} (settings page)`;
+            continue;
+          }
+          const html = await response.text();
+          const usernameMatch = SETTINGS_SCREEN_NAME_REGEX.exec(html);
+          const idMatch = SETTINGS_USER_ID_REGEX.exec(html);
+          const nameMatch = SETTINGS_NAME_REGEX.exec(html);
+          const username = usernameMatch?.[1];
+          const userId = idMatch?.[1];
+          const name = nameMatch?.[1]?.replace(/\\"/g, '"');
+          if (username && userId) {
+            return {
+              success: true,
+              user: {
+                id: userId,
+                username,
+                name: name || username
+              }
+            };
+          }
+          lastError = "Could not parse settings page for user info";
+        } catch (error2) {
+          lastError = error2 instanceof Error ? error2.message : String(error2);
+        }
+      }
+      return {
+        success: false,
+        error: lastError ?? "Unknown error fetching current user"
+      };
+    }
+    /**
+     * Get users that a user is following
+     */
+    async getFollowing(userId, count = 20, cursor) {
+      const variables = {
+        userId,
+        count,
+        includePromotedContent: false
+      };
+      if (cursor) {
+        variables.cursor = cursor;
+      }
+      const features = buildFollowingFeatures();
+      const params = new URLSearchParams({
+        variables: JSON.stringify(variables),
+        features: JSON.stringify(features)
+      });
+      const tryOnce = async () => {
+        let lastError;
+        let had404 = false;
+        const queryIds = await this.getFollowingQueryIds();
+        for (const queryId of queryIds) {
+          const url2 = `${TWITTER_API_BASE}/${queryId}/Following?${params.toString()}`;
+          try {
+            const response = await this.fetchWithTimeout(url2, {
+              method: "GET",
+              headers: this.getHeaders()
+            });
+            if (response.status === 404) {
+              had404 = true;
+              lastError = `HTTP ${response.status}`;
+              continue;
+            }
+            if (!response.ok) {
+              const text = await response.text();
+              return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}`, had404 };
+            }
+            const data = await response.json();
+            if (data.errors && data.errors.length > 0) {
+              return { success: false, error: data.errors.map((e) => e.message).join(", "), had404 };
+            }
+            const instructions = data.data?.user?.result?.timeline?.timeline?.instructions;
+            const users = parseUsersFromInstructions(instructions);
+            const nextCursor = extractCursorFromInstructions(instructions);
+            return { success: true, users, nextCursor, had404 };
+          } catch (error2) {
+            lastError = error2 instanceof Error ? error2.message : String(error2);
+          }
+        }
+        return { success: false, error: lastError ?? "Unknown error fetching following", had404 };
+      };
+      const { result, refreshed } = await this.withRefreshedQueryIdsOn404(tryOnce);
+      if (result.success) {
+        return { success: true, users: result.users, nextCursor: result.nextCursor };
+      }
+      if (refreshed) {
+        const restAttempt = await this.getFollowingViaRest(userId, count, cursor);
+        if (restAttempt.success) {
+          return restAttempt;
+        }
+      }
+      return { success: false, error: result.error };
+    }
+    /**
+     * Get users that follow a user
+     */
+    async getFollowers(userId, count = 20, cursor) {
+      const variables = {
+        userId,
+        count,
+        includePromotedContent: false
+      };
+      if (cursor) {
+        variables.cursor = cursor;
+      }
+      const features = buildFollowingFeatures();
+      const params = new URLSearchParams({
+        variables: JSON.stringify(variables),
+        features: JSON.stringify(features)
+      });
+      const tryOnce = async () => {
+        let lastError;
+        let had404 = false;
+        const queryIds = await this.getFollowersQueryIds();
+        for (const queryId of queryIds) {
+          const url2 = `${TWITTER_API_BASE}/${queryId}/Followers?${params.toString()}`;
+          try {
+            const response = await this.fetchWithTimeout(url2, {
+              method: "GET",
+              headers: this.getHeaders()
+            });
+            if (response.status === 404) {
+              had404 = true;
+              lastError = `HTTP ${response.status}`;
+              continue;
+            }
+            if (!response.ok) {
+              const text = await response.text();
+              return { success: false, error: `HTTP ${response.status}: ${text.slice(0, 200)}`, had404 };
+            }
+            const data = await response.json();
+            if (data.errors && data.errors.length > 0) {
+              return { success: false, error: data.errors.map((e) => e.message).join(", "), had404 };
+            }
+            const instructions = data.data?.user?.result?.timeline?.timeline?.instructions;
+            const users = parseUsersFromInstructions(instructions);
+            const nextCursor = extractCursorFromInstructions(instructions);
+            return { success: true, users, nextCursor, had404 };
+          } catch (error2) {
+            lastError = error2 instanceof Error ? error2.message : String(error2);
+          }
+        }
+        return { success: false, error: lastError ?? "Unknown error fetching followers", had404 };
+      };
+      const { result, refreshed } = await this.withRefreshedQueryIdsOn404(tryOnce);
+      if (result.success) {
+        return { success: true, users: result.users, nextCursor: result.nextCursor };
+      }
+      if (refreshed) {
+        const restAttempt = await this.getFollowersViaRest(userId, count, cursor);
+        if (restAttempt.success) {
+          return restAttempt;
+        }
+      }
+      return { success: false, error: result.error };
+    }
+  }
+  return TwitterClientUsers;
+}
+
+// node_modules/.pnpm/@connormartin+bird@0.8.0/node_modules/@connormartin/bird/dist/lib/twitter-client.js
+var MixedTwitterClient = withNews(withUserTweets(withUserLookup(withUsers(withLists(withHome(withTimelines(withSearch(withTweetDetails(withPosting(withEngagement(withFollow(withBookmarks(withMedia(TwitterClientBase))))))))))))));
+var TwitterClient = class extends MixedTwitterClient {
+};
+
+// src/twitter-client.ts
+function detectChromeProfiles() {
+  if (process.platform !== "darwin") return [];
+  const chromeDirs = [
+    join2(process.env.HOME || "", "Library/Application Support/Google/Chrome"),
+    join2(process.env.HOME || "", "Library/Application Support/BraveSoftware/Brave-Browser")
+  ];
+  const profiles = [];
+  for (const chromeDir of chromeDirs) {
+    if (!existsSync9(chromeDir)) continue;
+    try {
+      const defaultCookies = join2(chromeDir, "Default", "Cookies");
+      if (existsSync9(defaultCookies)) {
+        profiles.push({
+          name: "Default",
+          mtimeMs: statSync2(defaultCookies).mtimeMs
+        });
+      }
+      const entries = readdirSync2(chromeDir);
+      for (const name of entries) {
+        if (!name.startsWith("Profile ")) continue;
+        const cookiesPath = join2(chromeDir, name, "Cookies");
+        if (existsSync9(cookiesPath)) {
+          profiles.push({
+            name,
+            mtimeMs: statSync2(cookiesPath).mtimeMs
+          });
+        }
+      }
+    } catch {
+    }
+  }
+  profiles.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return profiles.map((p) => p.name);
+}
+var TwitterClientError = class extends Error {
+  constructor(message, code) {
+    super(message);
+    this.code = code;
+    this.name = "TwitterClientError";
+  }
+};
+var cachedClient = null;
+var cachedCookies = null;
+async function resolveTwitterCredentials() {
+  const allWarnings = [];
+  const firefoxProfile = process.env.FIREFOX_PROFILE;
+  const safariResult = await resolveCredentials({
+    cookieSource: ["safari"]
+  });
+  allWarnings.push(...safariResult.warnings);
+  if (safariResult.cookies.authToken && safariResult.cookies.ct0) {
+    return { cookies: safariResult.cookies, warnings: allWarnings };
+  }
+  const explicitChromeProfile = process.env.CHROME_PROFILE;
+  if (explicitChromeProfile) {
+    const chromeResult = await resolveCredentials({
+      cookieSource: ["chrome"],
+      chromeProfile: explicitChromeProfile
+    });
+    allWarnings.push(...chromeResult.warnings);
+    if (chromeResult.cookies.authToken && chromeResult.cookies.ct0) {
+      return { cookies: chromeResult.cookies, warnings: allWarnings };
+    }
+  } else {
+    const profiles = detectChromeProfiles();
+    for (const profile of profiles) {
+      const chromeResult = await resolveCredentials({
+        cookieSource: ["chrome"],
+        chromeProfile: profile
+      });
+      if (chromeResult.cookies.authToken && chromeResult.cookies.ct0) {
+        return { cookies: chromeResult.cookies, warnings: allWarnings };
+      }
+    }
+    if (profiles.length === 0) {
+      allWarnings.push("No Chrome profiles found.");
+    } else {
+      allWarnings.push(`Tried ${profiles.length} Chrome profile(s), none had Twitter cookies.`);
+    }
+  }
+  const firefoxResult = await resolveCredentials({
+    cookieSource: ["firefox"],
+    firefoxProfile
+  });
+  allWarnings.push(...firefoxResult.warnings);
+  if (firefoxResult.cookies.authToken && firefoxResult.cookies.ct0) {
+    return { cookies: firefoxResult.cookies, warnings: allWarnings };
+  }
+  return {
+    cookies: firefoxResult.cookies,
+    warnings: allWarnings
+  };
+}
+async function getTwitterClient() {
+  if (cachedClient) {
+    return cachedClient;
+  }
+  const { cookies, warnings } = await resolveTwitterCredentials();
+  if (!cookies.authToken || !cookies.ct0) {
+    const error2 = new TwitterClientError(
+      "Twitter credentials not found. Please log in to x.com in Safari, Chrome, or Firefox.",
+      "NO_CREDENTIALS"
+    );
+    error2.warnings = warnings;
+    throw error2;
+  }
+  cachedCookies = cookies;
+  cachedClient = new TwitterClient({ cookies });
+  return cachedClient;
+}
+async function checkTwitterCredentials() {
+  const { cookies, warnings } = await resolveTwitterCredentials();
+  if (!cookies.authToken || !cookies.ct0) {
+    return {
+      valid: false,
+      warnings: [
+        ...warnings,
+        "No valid Twitter credentials found. Please log in to x.com in Safari, Chrome, or Firefox."
+      ]
+    };
+  }
+  try {
+    const client = new TwitterClient({ cookies });
+    const result = await client.getCurrentUser();
+    if (!result.success || !result.user) {
+      return {
+        valid: false,
+        source: cookies.source ?? void 0,
+        warnings: [...warnings, result.error ?? "Failed to verify credentials"]
+      };
+    }
+    cachedCookies = cookies;
+    cachedClient = client;
+    return {
+      valid: true,
+      source: cookies.source ?? void 0,
+      warnings,
+      user: result.user
+    };
+  } catch (error2) {
+    return {
+      valid: false,
+      source: cookies.source ?? void 0,
+      warnings: [
+        ...warnings,
+        `Credential verification failed: ${error2 instanceof Error ? error2.message : String(error2)}`
+      ]
+    };
+  }
+}
+
+// src/tools/twitter.ts
+function noCredentialsError() {
+  return {
+    error: "Twitter credentials not found",
+    instructions: [
+      "Open x.com in Safari, Chrome, or Firefox",
+      "Log in to your Twitter/X account",
+      "Return here and retry"
+    ]
+  };
+}
+function apiError(error2) {
+  const message = error2 instanceof Error ? error2.message : String(error2);
+  return { error: message };
+}
+async function twitterCheck() {
+  try {
+    const result = await checkTwitterCredentials();
+    if (!result.valid) {
+      return {
+        authenticated: false,
+        source: result.source,
+        warnings: result.warnings,
+        instructions: [
+          "Open x.com in Safari, Chrome, or Firefox",
+          "Log in to your Twitter/X account",
+          "Return here and retry"
+        ]
+      };
+    }
+    return {
+      authenticated: true,
+      source: result.source,
+      user: result.user,
+      warnings: result.warnings.length > 0 ? result.warnings : void 0
+    };
+  } catch (error2) {
+    return apiError(error2);
+  }
+}
+async function twitterWhoami() {
+  try {
+    const client = await getTwitterClient();
+    const result = await client.getCurrentUser();
+    if (!result.success || !result.user) {
+      return { error: result.error ?? "Failed to get current user" };
+    }
+    return {
+      id: result.user.id,
+      username: result.user.username,
+      name: result.user.name,
+      profileUrl: `https://x.com/${result.user.username}`
+    };
+  } catch (error2) {
+    if (error2 instanceof TwitterClientError && error2.code === "NO_CREDENTIALS") {
+      return noCredentialsError();
+    }
+    return apiError(error2);
+  }
+}
+async function twitterFollowing(args) {
+  try {
+    const client = await getTwitterClient();
+    let targetUserId = args.userId;
+    if (!targetUserId) {
+      if (args.username) {
+        const lookupResult = await client.getUserIdByUsername(args.username);
+        if (!lookupResult.success || !lookupResult.userId) {
+          return { error: lookupResult.error ?? `User @${args.username} not found` };
+        }
+        targetUserId = lookupResult.userId;
+      } else {
+        const currentUser = await client.getCurrentUser();
+        if (!currentUser.success || !currentUser.user) {
+          return { error: currentUser.error ?? "Failed to get current user" };
+        }
+        targetUserId = currentUser.user.id;
+      }
+    }
+    const allUsers = [];
+    let cursor = args.cursor;
+    const pageSize = args.count ?? (args.all ? 200 : 50);
+    do {
+      const result = await client.getFollowing(targetUserId, pageSize, cursor);
+      if (!result.success) {
+        if (allUsers.length > 0) {
+          return {
+            users: allUsers,
+            count: allUsers.length,
+            partial: true,
+            error: result.error
+          };
+        }
+        return { error: result.error ?? "Failed to get following list" };
+      }
+      if (result.users) {
+        allUsers.push(...result.users);
+      }
+      cursor = result.nextCursor;
+      if (!args.all) {
+        return {
+          users: formatUsers(allUsers),
+          count: allUsers.length,
+          nextCursor: cursor
+        };
+      }
+    } while (cursor);
+    return {
+      users: formatUsers(allUsers),
+      count: allUsers.length
+    };
+  } catch (error2) {
+    if (error2 instanceof TwitterClientError && error2.code === "NO_CREDENTIALS") {
+      return noCredentialsError();
+    }
+    return apiError(error2);
+  }
+}
+async function twitterFollowers(args) {
+  try {
+    const client = await getTwitterClient();
+    let targetUserId = args.userId;
+    if (!targetUserId) {
+      if (args.username) {
+        const lookupResult = await client.getUserIdByUsername(args.username);
+        if (!lookupResult.success || !lookupResult.userId) {
+          return { error: lookupResult.error ?? `User @${args.username} not found` };
+        }
+        targetUserId = lookupResult.userId;
+      } else {
+        const currentUser = await client.getCurrentUser();
+        if (!currentUser.success || !currentUser.user) {
+          return { error: currentUser.error ?? "Failed to get current user" };
+        }
+        targetUserId = currentUser.user.id;
+      }
+    }
+    const pageSize = args.count ?? 50;
+    const result = await client.getFollowers(targetUserId, pageSize, args.cursor);
+    if (!result.success) {
+      return { error: result.error ?? "Failed to get followers list" };
+    }
+    return {
+      users: formatUsers(result.users ?? []),
+      count: result.users?.length ?? 0,
+      nextCursor: result.nextCursor
+    };
+  } catch (error2) {
+    if (error2 instanceof TwitterClientError && error2.code === "NO_CREDENTIALS") {
+      return noCredentialsError();
+    }
+    return apiError(error2);
+  }
+}
+async function twitterBookmarks(args) {
+  try {
+    const client = await getTwitterClient();
+    if (args.all) {
+      const result2 = await client.getAllBookmarks({ cursor: args.cursor });
+      if (!result2.success) {
+        return { error: result2.error ?? "Failed to get bookmarks" };
+      }
+      return {
+        tweets: formatTweets(result2.tweets ?? []),
+        count: result2.tweets?.length ?? 0,
+        nextCursor: result2.nextCursor
+      };
+    }
+    const count = args.count ?? 20;
+    const result = await client.getBookmarks(count);
+    if (!result.success) {
+      return { error: result.error ?? "Failed to get bookmarks" };
+    }
+    return {
+      tweets: formatTweets(result.tweets ?? []),
+      count: result.tweets?.length ?? 0,
+      nextCursor: result.nextCursor
+    };
+  } catch (error2) {
+    if (error2 instanceof TwitterClientError && error2.code === "NO_CREDENTIALS") {
+      return noCredentialsError();
+    }
+    return apiError(error2);
+  }
+}
+async function twitterNews(args) {
+  try {
+    const client = await getTwitterClient();
+    const validTabs = ["forYou", "news", "sports", "entertainment"];
+    let tabs;
+    if (args.tab) {
+      const tab = args.tab;
+      if (validTabs.includes(tab)) {
+        tabs = [tab];
+      }
+    } else if (args.tabs) {
+      tabs = args.tabs.filter((t) => validTabs.includes(t));
+    }
+    const result = await client.getNews(args.count ?? 10, {
+      tabs,
+      withTweets: args.withTweets
+    });
+    if (!result.success) {
+      return { error: result.error ?? "Failed to get news" };
+    }
+    return {
+      items: formatNewsItems(result.items),
+      count: result.items.length
+    };
+  } catch (error2) {
+    if (error2 instanceof TwitterClientError && error2.code === "NO_CREDENTIALS") {
+      return noCredentialsError();
+    }
+    return apiError(error2);
+  }
+}
+async function twitterSearch(args) {
+  try {
+    const client = await getTwitterClient();
+    const count = args.count ?? 20;
+    const result = await client.search(args.query, count);
+    if (!result.success) {
+      return { error: result.error ?? "Search failed" };
+    }
+    return {
+      tweets: formatTweets(result.tweets ?? []),
+      count: result.tweets?.length ?? 0,
+      query: args.query,
+      nextCursor: result.nextCursor
+    };
+  } catch (error2) {
+    if (error2 instanceof TwitterClientError && error2.code === "NO_CREDENTIALS") {
+      return noCredentialsError();
+    }
+    return apiError(error2);
+  }
+}
+async function twitterLikes(args) {
+  try {
+    const client = await getTwitterClient();
+    if (args.all) {
+      const result2 = await client.getAllLikes({ cursor: args.cursor });
+      if (!result2.success) {
+        return { error: result2.error ?? "Failed to get likes" };
+      }
+      return {
+        tweets: formatTweets(result2.tweets ?? []),
+        count: result2.tweets?.length ?? 0,
+        nextCursor: result2.nextCursor
+      };
+    }
+    const count = args.count ?? 20;
+    const result = await client.getLikes(count);
+    if (!result.success) {
+      return { error: result.error ?? "Failed to get likes" };
+    }
+    return {
+      tweets: formatTweets(result.tweets ?? []),
+      count: result.tweets?.length ?? 0,
+      nextCursor: result.nextCursor
+    };
+  } catch (error2) {
+    if (error2 instanceof TwitterClientError && error2.code === "NO_CREDENTIALS") {
+      return noCredentialsError();
+    }
+    return apiError(error2);
+  }
+}
+async function twitterRead(args) {
+  try {
+    const client = await getTwitterClient();
+    let tweetId = args.tweetId;
+    if (!tweetId && args.url) {
+      const match = args.url.match(/(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
+      if (match) {
+        tweetId = match[1];
+      } else {
+        return { error: "Invalid tweet URL format" };
+      }
+    }
+    if (!tweetId) {
+      return { error: "Either tweetId or url is required" };
+    }
+    const result = await client.getTweet(tweetId);
+    if (!result.success || !result.tweet) {
+      return { error: result.error ?? "Tweet not found" };
+    }
+    const response = {
+      tweet: formatTweet(result.tweet)
+    };
+    if (args.includeReplies) {
+      const repliesResult = await client.getReplies(tweetId);
+      if (repliesResult.success && repliesResult.tweets) {
+        response.replies = formatTweets(repliesResult.tweets);
+      }
+    }
+    if (args.includeThread) {
+      const threadResult = await client.getThread(tweetId);
+      if (threadResult.success && threadResult.tweets) {
+        response.thread = formatTweets(threadResult.tweets);
+      }
+    }
+    return response;
+  } catch (error2) {
+    if (error2 instanceof TwitterClientError && error2.code === "NO_CREDENTIALS") {
+      return noCredentialsError();
+    }
+    return apiError(error2);
+  }
+}
+function formatUser(user) {
+  return {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    description: user.description,
+    followersCount: user.followersCount,
+    followingCount: user.followingCount,
+    isBlueVerified: user.isBlueVerified,
+    profileImageUrl: user.profileImageUrl?.replace("_normal", "_400x400"),
+    profileUrl: `https://x.com/${user.username}`
+  };
+}
+function formatUsers(users) {
+  return users.map(formatUser);
+}
+function formatTweet(tweet) {
+  return {
+    id: tweet.id,
+    text: tweet.text,
+    author: tweet.author,
+    authorId: tweet.authorId,
+    createdAt: tweet.createdAt,
+    replyCount: tweet.replyCount,
+    retweetCount: tweet.retweetCount,
+    likeCount: tweet.likeCount,
+    url: `https://x.com/${tweet.author.username}/status/${tweet.id}`,
+    conversationId: tweet.conversationId,
+    inReplyToStatusId: tweet.inReplyToStatusId,
+    quotedTweet: tweet.quotedTweet ? formatTweet(tweet.quotedTweet) : void 0,
+    media: tweet.media
+  };
+}
+function formatTweets(tweets) {
+  return tweets.map(formatTweet);
+}
+function formatNewsItems(items) {
+  return items.map((item) => ({
+    id: item.id,
+    headline: item.headline,
+    category: item.category,
+    timeAgo: item.timeAgo,
+    postCount: item.postCount,
+    description: item.description,
+    url: item.url,
+    tweets: item.tweets ? formatTweets(item.tweets) : void 0
+  }));
+}
+
 // src/index.ts
 var server = new Server(
   {
@@ -22316,6 +29168,113 @@ var tools = [
       },
       required: ["token"]
     }
+  },
+  // Twitter Operations (via @steipete/bird)
+  {
+    name: "twitter_check",
+    description: "Verify Twitter/X credentials and show the logged-in user. Reads cookies from Safari, Chrome, or Firefox.",
+    inputSchema: {
+      type: "object",
+      properties: {}
+    }
+  },
+  {
+    name: "twitter_whoami",
+    description: "Get the current Twitter/X user's info (id, username, name).",
+    inputSchema: {
+      type: "object",
+      properties: {}
+    }
+  },
+  {
+    name: "twitter_following",
+    description: "Get the list of accounts a user follows on Twitter/X. Defaults to the authenticated user.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        username: { type: "string", description: "Username to look up (without @). Defaults to current user." },
+        userId: { type: "string", description: "User ID to look up (alternative to username)" },
+        count: { type: "number", description: "Number of users to fetch (default: 50)" },
+        all: { type: "boolean", description: "Fetch all following (paginate until complete)" },
+        cursor: { type: "string", description: "Pagination cursor from previous request" }
+      }
+    }
+  },
+  {
+    name: "twitter_followers",
+    description: "Get the list of accounts that follow a user on Twitter/X. Defaults to the authenticated user.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        username: { type: "string", description: "Username to look up (without @). Defaults to current user." },
+        userId: { type: "string", description: "User ID to look up (alternative to username)" },
+        count: { type: "number", description: "Number of users to fetch (default: 50)" },
+        cursor: { type: "string", description: "Pagination cursor from previous request" }
+      }
+    }
+  },
+  {
+    name: "twitter_bookmarks",
+    description: "Get the authenticated user's bookmarked tweets on Twitter/X.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        count: { type: "number", description: "Number of bookmarks to fetch (default: 20)" },
+        all: { type: "boolean", description: "Fetch all bookmarks (paginate until complete)" },
+        cursor: { type: "string", description: "Pagination cursor from previous request" }
+      }
+    }
+  },
+  {
+    name: "twitter_news",
+    description: "Get trending news and topics from Twitter/X Explore page.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        count: { type: "number", description: "Number of news items to fetch (default: 10)" },
+        tab: { type: "string", enum: ["forYou", "news", "sports", "entertainment"], description: "Specific tab to fetch from" },
+        tabs: { type: "array", items: { type: "string" }, description: "Multiple tabs to fetch from" },
+        withTweets: { type: "boolean", description: "Include related tweets for each news item" }
+      }
+    }
+  },
+  {
+    name: "twitter_search",
+    description: "Search for tweets on Twitter/X by query.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query" },
+        count: { type: "number", description: "Number of tweets to fetch (default: 20)" },
+        cursor: { type: "string", description: "Pagination cursor from previous request" }
+      },
+      required: ["query"]
+    }
+  },
+  {
+    name: "twitter_likes",
+    description: "Get the authenticated user's liked tweets on Twitter/X.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        count: { type: "number", description: "Number of likes to fetch (default: 20)" },
+        all: { type: "boolean", description: "Fetch all likes (paginate until complete)" },
+        cursor: { type: "string", description: "Pagination cursor from previous request" }
+      }
+    }
+  },
+  {
+    name: "twitter_read",
+    description: "Read a specific tweet by ID or URL. Optionally fetch replies or full thread.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tweetId: { type: "string", description: "Tweet ID to read" },
+        url: { type: "string", description: "Tweet URL (alternative to tweetId)" },
+        includeReplies: { type: "boolean", description: "Include replies to the tweet" },
+        includeThread: { type: "boolean", description: "Include the full conversation thread" }
+      }
+    }
   }
 ];
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -22486,6 +29445,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
         break;
       }
+      // Twitter operations
+      case "twitter_check":
+        result = await twitterCheck();
+        break;
+      case "twitter_whoami":
+        result = await twitterWhoami();
+        break;
+      case "twitter_following":
+        result = await twitterFollowing(args);
+        break;
+      case "twitter_followers":
+        result = await twitterFollowers(args);
+        break;
+      case "twitter_bookmarks":
+        result = await twitterBookmarks(args);
+        break;
+      case "twitter_news":
+        result = await twitterNews(args);
+        break;
+      case "twitter_search":
+        result = await twitterSearch(args);
+        break;
+      case "twitter_likes":
+        result = await twitterLikes(args);
+        break;
+      case "twitter_read":
+        result = await twitterRead(args);
+        break;
       default:
         return {
           content: [{ type: "text", text: `Unknown tool: ${name}` }],
