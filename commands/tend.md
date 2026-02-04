@@ -10,6 +10,8 @@ allowed-tools:
   - mcp__plugin_seed_seed-network__batch_mark_signals_tended
   - mcp__plugin_seed_seed-network__list_signals
   - mcp__plugin_seed_seed-network__get_signal
+  - mcp__plugin_seed_seed-network__twitter_read
+  - mcp__plugin_seed_seed-network__twitter_search
   - WebSearch
   - WebFetch
   - AskUserQuestion
@@ -64,16 +66,20 @@ Otherwise:
 For each signal, research recent activity based on signal type:
 
 **Twitter accounts**:
-- Search for recent tweets, threads, announcements
-- Look for viral moments, notable interactions
-- Check for any news mentions
+- **REQUIRED**: Use `twitter_read` to fetch the account's recent tweets directly
+- Review their tweets for announcements, threads, notable takes, or viral moments
+- Look for endorsements of other accounts/companies (potential new signals)
+- Optionally use `twitter_search` to find mentions or discussions about them
+- Use WebSearch for broader news coverage if needed
 
 **Companies**:
+- If the signal has a Twitter handle, use `twitter_read` to check their recent tweets
 - Search for funding news, product launches
 - Look for press coverage, blog posts
-- Check social media for announcements
+- Use `twitter_search` to find discussions about the company
 
 **People**:
+- If the signal has a Twitter handle, use `twitter_read` to check their recent tweets
 - Search for career moves, speaking engagements
 - Look for thought leadership content
 - Check for media appearances
